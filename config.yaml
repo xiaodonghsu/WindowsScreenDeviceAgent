@@ -1,0 +1,23 @@
+thingsboard:
+  host: "nuc10.i.uassist.cn"
+  port: 1883
+  access_token: "ZJKsK4GqSZTm8vAn3CYg"
+
+device:
+  name: "SCREEN-PC-01"
+  heartbeat_interval: 10
+
+player:
+  slider:
+    exe: "D:\\Program Files\\Kingsoft\\WPS Office\\ksolaunch.exe"
+  browser:
+    exe: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    exe_args:
+      - "--start-fullscreen"
+      - "--remote-debugging-port=9222"
+      - "--user-data-dir=D:\\Temp\\ChromeDevSession"
+      - "--remote-allow-origins=*"
+    cdp_port: 9222
+  videoplayer:
+    exe: "D:\\Program Files\\VideoLAN\\VLC\\vlc.exe"
+    port: 9999
