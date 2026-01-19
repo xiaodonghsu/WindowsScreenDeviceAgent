@@ -20,4 +20,5 @@ player:
     cdp_port: 9222
   videoplayer:
     exe: "D:\\Program Files\\VideoLAN\\VLC\\vlc.exe"
+    host: "127.0.0.1"
     port: 9999
