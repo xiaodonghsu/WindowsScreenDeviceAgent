@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 test*
+
+# Logs - but ignore logs directory
+logs/

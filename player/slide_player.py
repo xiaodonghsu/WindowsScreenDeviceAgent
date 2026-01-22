@@ -224,9 +224,9 @@ def get_status():
     controller = SlidePlayerController()
     return controller.get_status()
 
-def play_ppt(slide_file: str, start_page: int = 1):
+def play_slide(url: str, startPage: int = 1):
     controller = SlidePlayerController()
-    controller.start_play(file_path=slide_file, start_slide=start_page)
+    controller.start_play(file_path=url, start_slide=startPage)
 
 def next_page():
     controller = SlidePlayerController()
@@ -235,3 +235,7 @@ def next_page():
 def prev_page():
     controller = SlidePlayerController()
     controller.previous_slide()
+
+def stop_slide(url: str, startPage: int = 1):
+    controller = SlidePlayerController()
+    controller.start_play(file_path=url, start_slide=startPage)

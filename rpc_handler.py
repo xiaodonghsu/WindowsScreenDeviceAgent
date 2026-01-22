@@ -1,7 +1,5 @@
 import json
-from player.slide_player import play_ppt, next_page, prev_page
-from player.video_player import play_video, stop_video
-from player.web_player import open_url
+import player
 
 def handle_rpc(tb_client, msg):
     topic = msg.topic
@@ -14,20 +12,18 @@ def handle_rpc(tb_client, msg):
     params = payload.get("params", {})
 
     try:
-        if method == "play_ppt":
-            play_ppt(params["url"], params.get("startPage", 1))
-        elif method == "next":
-            next_page()
-        elif method == "prev":
-            prev_page()
-        elif method == "play_video":
-            play_video(params["url"])
-        elif method == "open_url":
-            open_url(params["url"])
-        elif method == "stop":
-            stop_video()
+        # 从模块中动态获取函数
+        func = None
+        if hasattr(player, method):
+            func = getattr(player, method)
+        if func is None:
+            raise Exception(f"未知的RPC方法: {method}")
+        
+        # 调用函数
+        if params:
+            func(**params)
         else:
-            raise Exception("Unknown RPC method")
+            func()
 
         tb_client.reply_rpc(request_id, {"result": "ok"})
     except Exception as e:

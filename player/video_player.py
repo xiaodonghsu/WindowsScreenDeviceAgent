@@ -63,12 +63,16 @@
 
 ''' 
 
+from typing import Any
+
+
 import os
 import socket
 import subprocess
 import time
-import yaml
 from dataclasses import dataclass
+
+from common.config import load_config
 
 
 @dataclass
@@ -99,11 +103,10 @@ class VLCRemote:
     def __init__(self) -> None:
         self.cfg = VLCConfig()
         # 读取配置文件
-        with open('config.yaml', 'r') as f:
-            cfg = yaml.safe_load(f)
-            self.cfg.vlc_exe = cfg.get('player', {}).get('videoplayer', {}).get('exe', 'vlc.exe')
-            self.cfg.host = cfg.get('player', {}).get('videoplayer', {}).get('host', '127.0.0.1')
-            self.cfg.port = cfg.get('player', {}).get('videoplayer', {}).get('port', 9999)
+        cfg: dict[str, dict[str, str|int]] = load_config()
+        self.cfg.vlc_exe = cfg.get('player', {}).get('videoplayer', {}).get('exe', 'vlc.exe')
+        self.cfg.host = cfg.get('player', {}).get('videoplayer', {}).get('host', '127.0.0.1')
+        self.cfg.port = cfg.get('player', {}).get('videoplayer', {}).get('port', 9999)
 
         if not os.path.exists(self.cfg.vlc_exe):
             raise FileNotFoundError(f"vlc.exe not found: {self.cfg.vlc_exe}")
@@ -264,3 +267,11 @@ def play_video(url):
 def stop_video():
     controller = VLCRemote()
     controller.stop_video()
+
+def forward_video(seconds: int = 10):
+    controller = VLCRemote()
+    controller.forward_video(seconds)
+
+def backward_video(seconds: int = 10):
+    controller = VLCRemote()    
+    controller.backward_video(seconds)

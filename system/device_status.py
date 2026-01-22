@@ -2,7 +2,7 @@ import psutil
 import socket
 import time
 from dataclasses import dataclass, field, asdict
-from typing import Dict
+from typing import Any, Dict
 # from system.device_attr import get_device_info
 
 # def collect_status():
@@ -19,7 +19,7 @@ def get_disk_usage():
     }
 
 # 获取网络接口状态
-def get_network_status():
+def get_network_status() -> dict[Any, Any]:
     net_if_addrs = psutil.net_if_addrs()
     net_if_stats = psutil.net_if_stats()
     interfaces = {}

@@ -8,7 +8,7 @@ device:
   heartbeat_interval: 10
 
 player:
-  slider:
+  slideplayer:
     exe: "D:\\Program Files\\Kingsoft\\WPS Office\\ksolaunch.exe"
   browser:
     exe: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
@@ -20,5 +20,9 @@ player:
     cdp_port: 9222
   videoplayer:
     exe: "D:\\Program Files\\VideoLAN\\VLC\\vlc.exe"
+    host: "127.0.0.1"
+    port: 9999
+  avatarplayer:
+    exe: "D:\\Files\\Documents\\Project\\yancheng_playground\\avatar_player\\dist\\avatar-player 1.0.0.exe"
     host: "127.0.0.1"
     port: 9999
