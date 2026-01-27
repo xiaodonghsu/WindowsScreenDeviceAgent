@@ -6,7 +6,7 @@ python -c "from common import get_cms_token; print(get_cms_token())"
 
 python -c "from common import download_config; import json; print(json.dumps(download_config(), indent=4))"
 
-python -c "from common import download_asset; print(download_asset())"
+python -c "from common import download_assets; print(download_assets())"
 
 
 ## 测试浏览器功能

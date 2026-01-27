@@ -123,7 +123,7 @@ def download_assets(cms_baseurl:str="", device_name:str="", scene_name:str="defa
         local_file = ""
 
         # 如果item_type 不是 webpage, 将文件下载到本地临时目录中
-        if item_type != "wbpage":
+        if item_type != "webpage":
             # 下载文件到临时目录中
             local_file = download_file(item_url)
 
@@ -132,8 +132,6 @@ def download_assets(cms_baseurl:str="", device_name:str="", scene_name:str="defa
                             "url": item_url,
                             "file": local_file,
                             "config": item_config})
-        if item_type == "wbpage":
-            item_url = item["asset"]["url"]
     with open(assets_file, "w", encoding="utf-8") as f:
         json.dump(assets_data, f,ensure_ascii=False)
     return assets_data

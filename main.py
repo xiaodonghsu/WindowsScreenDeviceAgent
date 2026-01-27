@@ -13,7 +13,7 @@ import argparse
 # 根据命令行的参数从服务端获取配置信息
 # 参数包括:
 #  --cms_baseurl=192.168.41.135:8080
-#  --cms_token="9cec8705d996b17ad80d3adba72e70182324c563170d2a3179072802cca31e6a8b54ad94596c3f1df88c201fed4e14e7d19a3d6b0926918deca7b8952bc655c9a827abc26a9c37dd495e5a93129791f186a0eb2ba47c44be9b6dcaaede088ef7027c6d4ecd365cf7e8374fe9f5832ca09ac3628a65d4949f050e3c0ef6911f7c"
+#  --cms_token="xxxx"
 #  --device_name=screen-d16
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--cms_baseurl", help="CMS服务器地址", default="")
