@@ -1,5 +1,14 @@
 # 测试脚本
 
+## 获取TOKEN,CONFIG
+
+python -c "from common import get_cms_token; print(get_cms_token())"
+
+python -c "from common import download_config; import json; print(json.dumps(download_config(), indent=4))"
+
+python -c "from common import download_asset; print(download_asset())"
+
+
 ## 测试浏览器功能
 
 python -c "from player import open_url; open_url('https://www.baidu.com')"
@@ -55,4 +64,9 @@ curl --location "http://nuc10.i.uassist.cn:8080/api/plugins/rpc/oneway/${THINGSB
         ""startPage"": 1  ^
     } ^
 }"
+
+
+## 公网 RPC 测试
+
+mosquitto_sub -h 106.14.186.252 -p 59145 -u 65UMyOJsOhhFhFidPCHS -t "v1/devices/me/rpc/request/+ " -v -d
 

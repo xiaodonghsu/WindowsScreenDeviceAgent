@@ -12,3 +12,8 @@ test*
 
 # Logs - but ignore logs directory
 logs/
+
+# configs
+.env
+config.json
+assets.json

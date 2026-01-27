@@ -96,9 +96,7 @@ class WebPlayer:
         try:
             url = f" http://localhost:{self.debug_port}/json/activate/{tab_id}"
             response = requests.get(url)
-            if response.status_code == 200:
-                print(f"成功激活标签页: {tab_id}")
-            else:
+            if not response.status_code == 200:
                 print(f"激活标签页失败: {response.text}")
         except Exception as e:
             print(f"激活标签页时出错: {e}")
