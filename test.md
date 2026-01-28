@@ -68,5 +68,37 @@ curl --location "http://nuc10.i.uassist.cn:8080/api/plugins/rpc/oneway/${THINGSB
 
 ## 公网 RPC 测试
 
-mosquitto_sub -h 106.14.186.252 -p 59145 -u 65UMyOJsOhhFhFidPCHS -t "v1/devices/me/rpc/request/+ " -v -d
+### device openeuler
 
+mosquitto_sub -h 106.14.186.252 -p 59145 -u b2tYLGnXbHUP8Gm2fWrR -t "v1/devices/me/rpc/request/+" -v -d
+
+mosquitto_sub -h 106.14.186.252 -p 59145 -u b2tYLGnXbHUP8Gm2fWrR -t "v1/devices/me/attributes" -v -d
+
+
+
+### 内网模式
+
+
+mosquitto_sub -h 192.168.41.135 -p 1883 -u b2tYLGnXbHUP8Gm2fWrR -t "v1/devices/me/rpc/request/+" -v -d
+
+### shell 测试
+
+mosquitto_sub -h 106.14.186.252 -p 59145 -u b2tYLGnXbHUP8Gm2fWrR -t "v1/devices/me/rpc/request/+" -v | while read -r topic payload; do
+    echo "收到命令: $payload"
+    
+    # 执行命令并捕获输出
+    result=$(eval "$payload" 2>&1)
+    exit_code=$?
+    
+    # 构建响应消息
+    response="{
+        \"command\": \"$payload\",
+        \"output\": \"$(echo $result | sed 's/\"/\\"/g')\",
+        \"exit_code\": $exit_code,
+        \"timestamp\": \"$(date -Iseconds)\"
+    }"
+    
+    # 发布结果
+    mosquitto_pub -h $BROKER -p $PORT -t "$RESPONSE_TOPIC" -m "$response"
+    echo "已发送响应: $response"
+done

@@ -73,7 +73,8 @@ import time
 from dataclasses import dataclass
 
 from common.config import load_config
-
+import logging
+logger = logging.getLogger(__name__)
 
 @dataclass
 class VLCConfig:
@@ -101,15 +102,16 @@ class VLCRemote:
     """
 
     def __init__(self) -> None:
-        self.cfg = VLCConfig()
+        self.config = VLCConfig()
         # 读取配置文件
-        cfg: dict[str, dict[str, str|int]] = load_config()
-        self.cfg.vlc_exe = cfg.get('player', {}).get('videoplayer', {}).get('exe', 'vlc.exe')
-        self.cfg.host = cfg.get('player', {}).get('videoplayer', {}).get('host', '127.0.0.1')
-        self.cfg.port = cfg.get('player', {}).get('videoplayer', {}).get('port', 9999)
+        config: dict[str, dict[str, str|int]] = load_config()
+        config = config.get("config")
+        self.config.vlc_exe = config.get('player', {}).get('videoplayer', {}).get('exe', 'vlc.exe')
+        self.config.host = config.get('player', {}).get('videoplayer', {}).get('host', '127.0.0.1')
+        self.config.port = config.get('player', {}).get('videoplayer', {}).get('port', 9999)
 
-        if not os.path.exists(self.cfg.vlc_exe):
-            raise FileNotFoundError(f"vlc.exe not found: {self.cfg.vlc_exe}")
+        if not os.path.exists(self.config.vlc_exe):
+            raise FileNotFoundError(f"vlc.exe not found: {self.config.vlc_exe}")
         self._proc: subprocess.Popen | None = None
 
     # ---------- 基础：发送 RC 命令 ----------
@@ -118,10 +120,10 @@ class VLCRemote:
         向 VLC RC 端口发送命令。VLC 没启动/端口没开会抛异常。
         Socket 保存为内部变量,读取操作可获得返回结果。
         """
-        # with socket.create_connection((self.cfg.host, self.cfg.port), timeout=timeout) as s:
+        # with socket.create_connection((self.config.host, self.config.port), timeout=timeout) as s:
         #     ret = s.sendall((command.strip() + "\n").encode("utf-8"))
         try:
-            with socket.create_connection((self.cfg.host, self.cfg.port), timeout=timeout) as s:
+            with socket.create_connection((self.config.host, self.config.port), timeout=timeout) as s:
                 s.sendall((command.strip() + "\n").encode("utf-8"))
                 if wait_return:
                     time.sleep(0.1)
@@ -155,7 +157,7 @@ class VLCRemote:
         # 获取状态
         response = self._send_rc("status", wait_return=True)
         for line in response.splitlines():
-            print(line)
+            logger.debug(line)
             # key, value = line.split(": ", maxsplit=1)
             # status[key] = value
         return status
@@ -165,7 +167,7 @@ class VLCRemote:
         从 playlist 输出中提取当前播放的媒体路径/URL
         """
         response = self._send_rc("playlist", wait_return=True)
-        print(response)
+        logger.debug(response)
         # 示例： |  *0 - file:///D:/videos/demo.mp4
         for line in response.splitlines():
             if "*" in line:
@@ -175,7 +177,7 @@ class VLCRemote:
     def is_running(self) -> bool:
         try:
             response = self._send_rc("help", timeout=0.2, wait_return=True)
-            # print(response)
+            logger.debug(response)
             return True
         except OSError:
             return False
@@ -186,22 +188,22 @@ class VLCRemote:
         启动 VLC.exe 并开启 RC 接口。
         如果 media_path 不为空，则启动后直接播放该媒体。
         """
-        if not os.path.isfile(self.cfg.vlc_exe):
-            raise FileNotFoundError(f"vlc.exe not found: {self.cfg.vlc_exe}")
+        if not os.path.isfile(self.config.vlc_exe):
+            raise FileNotFoundError(f"vlc.exe not found: {self.config.vlc_exe}")
 
         cmd = [
-            self.cfg.vlc_exe,
+            self.config.vlc_exe,
             "--intf", "dummy",                 # 无需VLC主UI交互也能播放（更像播放器服务）
             "--extraintf", "rc",
-            "--rc-host", f"{self.cfg.host}:{self.cfg.port}",
+            "--rc-host", f"{self.config.host}:{self.config.port}",
             "--rc-quiet",                      # 减少输出
         ]
 
-        if self.cfg.fullscreen:
+        if self.config.fullscreen:
             cmd.append("--fullscreen")
-        if self.cfg.loop:
+        if self.config.loop:
             cmd.append("--loop")
-        if self.cfg.no_title:
+        if self.config.no_title:
             cmd.append("--no-video-title-show")
 
         # 如果指定媒体文件/URL，就让 VLC 直接播放它

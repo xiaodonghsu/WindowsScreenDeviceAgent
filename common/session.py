@@ -14,6 +14,3 @@ def get_session_id(process_id=None):
         return session_id.value 
     else:
         return None
-
-if __name__ == "__main__":
-    print(f"Current session ID: {get_session_id()}")

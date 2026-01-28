@@ -1,12 +1,14 @@
 import json
 import player
+import logging
+logger = logging.getLogger(__name__)
 
 def handle_rpc(tb_client, msg):
     topic = msg.topic
     request_id = topic.split("/")[-1]
     payload = json.loads(msg.payload.decode())
 
-    print(payload)
+    logger.debug(f"RPC请求内容: {payload}")
 
     method = payload.get("method")
     params = payload.get("params", {})
@@ -28,3 +30,4 @@ def handle_rpc(tb_client, msg):
         tb_client.reply_rpc(request_id, {"result": "ok"})
     except Exception as e:
         tb_client.reply_rpc(request_id, {"error": str(e)})
+

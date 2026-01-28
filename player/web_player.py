@@ -1,6 +1,4 @@
 from typing import Literal
-
-
 import os
 import subprocess
 import psutil
@@ -10,13 +8,16 @@ import requests
 import websocket
 import json
 import time
+import logging
+logger = logging.getLogger(__name__)
 
 class WebPlayer:
     def __init__(self, browser_exe_file:str="", debug_port:int=9222):
         if browser_exe_file == "":
-            cfg = load_config()
-            browser_exe_file= cfg.get("player", {}).get("browser", {}).get("exe", "")
-            debug_port:int = cfg.get("player", {}).get("browser", {}).get("cdp_port", 9222)
+            config = load_config()
+            config = config.get("config", {})
+            browser_exe_file= config.get("player", {}).get("browser", {}).get("exe", "")
+            debug_port:int = config.get("player", {}).get("browser", {}).get("cdp_port", 9222)
         if browser_exe_file is None:
             raise ValueError("Browser path must be specified in config.yaml.")
         if os.path.exists(browser_exe_file) is False:
@@ -35,10 +36,10 @@ class WebPlayer:
         info = self.get_info()
         if info is None:
             # 检查同类型的浏览器已经打开,如果有必须关闭
-            # print("__关闭可能已经打开的浏览器")
+            logger.info("__关闭可能已经打开的浏览器")
             self.__close_browser()
             # 启动浏览器
-            # print("__启动浏览器")
+            logger.info("__启动浏览器")
             self.__start_browser(url)
 
         info = self.get_info()
@@ -57,7 +58,7 @@ class WebPlayer:
             "--UseBasicParsing",
             url
             ]
-        print(f"启动浏览器: {' '.join(cmdline)}")
+        logger.info(f"启动浏览器: {' '.join(cmdline)}")
         subprocess.Popen(cmdline)
 
     def __close_browser(self):
@@ -65,7 +66,7 @@ class WebPlayer:
         try:
             for process in psutil.process_iter():
                 if process.name().lower() == browser_name:
-                    print(f"终止进程: {process.pid} - {process.nameline()}")
+                    logger.info(f"终止进程: {process.pid} - {process.nameline()}")
                     process.terminate()
                     time.sleep(1)
         except:
@@ -77,7 +78,7 @@ class WebPlayer:
             tabs = response.json()
             return tabs
         except Exception as e:
-            # print(e)
+            logger.error(e)
             return None
 
     def get_info(self):
@@ -86,7 +87,7 @@ class WebPlayer:
             info = response.json()
             return info
         except Exception as e:
-            # print(e)
+            logger.error(e)
             return None
 
     def activate_tab(self, tab_id):
@@ -97,9 +98,9 @@ class WebPlayer:
             url = f" http://localhost:{self.debug_port}/json/activate/{tab_id}"
             response = requests.get(url)
             if not response.status_code == 200:
-                print(f"激活标签页失败: {response.text}")
+                logger.error(f"激活标签页失败: {response.text}")
         except Exception as e:
-            print(f"激活标签页时出错: {e}")
+            logger.error(f"激活标签页时出错: {e}")
 
 
     def browser_interactive(self, payload_list = [{}]):
@@ -113,7 +114,7 @@ class WebPlayer:
             if tabs is not None:
                 ws_url = tabs[0].get("webSocketDebuggerUrl", None)
                 if ws_url:
-                    print(f"连接到 WebSocket: {ws_url}")
+                    logger.info(f"连接到 WebSocket: {ws_url}")
                     ws = websocket.WebSocket()
                     ws.connect(ws_url)
                     for payload in payload_list:
@@ -121,11 +122,11 @@ class WebPlayer:
                         payload["id"] = self.message_id
                         ws.send(json.dumps(payload))
                         result = ws.recv()
-                        print(f"{payload.get('method')} 响应: {result}")
+                        logger.info(f"{payload.get('method')} 响应: {result}")
                     ws.close()
             return True
         except Exception as e:
-            print(f"打开URL时出错: {e}")
+            logger.error(f"打开URL时出错: {e}")
             return False
         
         
@@ -185,7 +186,7 @@ class WebPlayer:
 
 
 def open_url(url:str) -> dict[str, str]:
-    print("浏览网页", url)
+    logger.info("浏览网页", url)
     wp = WebPlayer()
     if not wp.start_browser(url):
         return {"result": "fail"}

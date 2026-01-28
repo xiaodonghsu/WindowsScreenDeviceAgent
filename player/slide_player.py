@@ -60,7 +60,8 @@ from typing import Optional
 
 import pywintypes
 import win32com.client
-
+import logging
+logger = logging.getLogger(__name__)
 
 APP_PROGIDS = ("Kwpp.Application", "PowerPoint.Application")
 
