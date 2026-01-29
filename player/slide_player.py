@@ -20,39 +20,10 @@
     - 停止播放：退出应用程序
 
 '''
-
-
-# OLD IMPLEMENTATION USING pyautogui AND subprocess
-
-
-# import subprocess
-# import pyautogui
-# import time
-
-
-
-# self.__slide_app_list = ["PowerPoint.Application", "Kwpp.Application"]
-
-# def play_ppt(url, start_page=1):
-#     subprocess.Popen([
-#         "ksolaunch",
-#         url
-#     ])
-#     time.sleep(5)
-#     pyautogui.press("f5")
-#     for _ in range(start_page - 1):
-#         pyautogui.press("pagedown")
-
-# def next_page():
-#     pyautogui.press("pagedown")
-
-# def prev_page():
-#     pyautogui.press("pageup")
-
-
-# VERSION USING win32com.client
-
 """Slide player control for Windows PowerPoint/WPS (Kwpp)."""
+
+from logging import Logger
+
 
 import os
 from dataclasses import dataclass
@@ -60,16 +31,18 @@ from typing import Optional
 
 import pywintypes
 import win32com.client
+import pythoncom
 import logging
-logger = logging.getLogger(__name__)
+from common import get_device_name
+logger: Logger = logging.getLogger(get_device_name())
 
 APP_PROGIDS = ("Kwpp.Application", "PowerPoint.Application")
 
 
 @dataclass
 class SlidePlayerStatus:
-    is_running: bool
-    is_visible: bool
+    is_running: bool = False
+    is_visible: bool = False
     app_name: Optional[str] = None
     file_path: Optional[str] = None
     current_slide_index: Optional[int] = None
@@ -81,9 +54,13 @@ class SlidePlayerController:
     """Controls slide playback for supported Windows presentation apps."""
 
     def __init__(self, prefer_kwpp: bool = True) -> None:
+        pythoncom.CoInitialize()
         self._progids = APP_PROGIDS if prefer_kwpp else APP_PROGIDS[::-1]
 
     def _get_running_app(self):
+        '''
+        获取当前正在运行的应用程序对象和程序的名字，如果没有，则返回None
+        '''
         for progid in self._progids:
             try:
                 return win32com.client.GetActiveObject(progid), progid
@@ -92,18 +69,29 @@ class SlidePlayerController:
         return None, None
 
     def _dispatch_app(self, progid: str):
+        '''
+        COM方式启动应用程序并返回应用程序对象
+        '''
         return win32com.client.Dispatch(progid)
 
     def _get_or_start_app(self):
+        '''
+        获取当前正在运行的应用程序;
+        如果没有正在运行的应用程序，则按顺序启动应用程序
+        '''
         app, progid = self._get_running_app()
         if app is not None:
             if app.Visible == 0:
                 app.Visible = True
             return app, progid
+
+        logger.info(f"没有正在运行的slide程序, 尝试启动slide程序")
+
         for progid in self._progids:
             try:
                 return self._dispatch_app(progid), progid
-            except pywintypes.com_error:
+            except Exception as e:
+                logger.info(f"尝试启动{progid}失败: {e}")
                 continue
         raise RuntimeError("Unable to start a slide player application.")
 
@@ -146,32 +134,27 @@ class SlidePlayerController:
         return False, None
 
     def get_status(self) -> SlidePlayerStatus:
+        status = SlidePlayerStatus()
         app, progid = self._get_running_app()
-        if app is None:
-            return SlidePlayerStatus(is_running=False)
 
-        is_visible: bool = False if app.Visible == 0 else True
+        if app is None:
+            status.is_running = False
+            return status
+        status.is_running = True
+        status.app_name = progid
+        print(app.Visible)
+        status.is_visible: bool = False if app.Visible == 0 else True
 
         presentation = self._get_active_presentation(app)
-        file_path = None
         if presentation is not None:
             try:
-                file_path = presentation.FullName
+                status.file_path = presentation.FullName
             except pywintypes.com_error:
-                file_path = None
+                pass
 
-        current_slide_index = self._get_active_window_slide_index(app)
-        is_presenting, show_slide_index = self._get_show_state(app)
-
-        return SlidePlayerStatus(
-            is_running=True,
-            is_visible=is_visible,
-            app_name=progid,
-            file_path=file_path,
-            current_slide_index=current_slide_index,
-            is_presenting=is_presenting,
-            current_show_slide_index=show_slide_index,
-        )
+        status.current_slide_index = self._get_active_window_slide_index(app)
+        status.is_presenting, status.show_slide_index = self._get_show_state(app)
+        return status
 
     def start_play(self, file_path: str, start_slide: int = 1) -> None:
         app, _ = self._get_or_start_app()

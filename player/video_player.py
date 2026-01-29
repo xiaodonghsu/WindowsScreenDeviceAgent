@@ -74,7 +74,8 @@ from dataclasses import dataclass
 
 from common.config import load_config
 import logging
-logger = logging.getLogger(__name__)
+from common import get_device_name
+logger = logging.getLogger(get_device_name())
 
 @dataclass
 class VLCConfig:

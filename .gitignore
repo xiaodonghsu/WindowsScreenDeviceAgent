@@ -17,3 +17,7 @@ logs/
 .env
 config.json
 assets.json
+
+# local files
+deploy.md
+test.md

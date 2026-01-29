@@ -35,7 +35,7 @@ key_press(key)
 
 ### 其他 支持的动作:
 '''
-
+from player.play_asset import play_asset
 from player.avatar_player import play_avatar, show_text, stop_avatar
 from player.slide_player import play_slide, next_page, prev_page
 from player.video_player import play_video, forward_video, backward_video, stop_video

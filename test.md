@@ -15,6 +15,9 @@ python -c "from player import open_url; open_url('https://www.baidu.com')"
 
 ## 测试幻灯片功能
 
+python -c "from player.slide_player import get_status; print(get_status())"
+
+
 python -c "from player.slide_player import play_slide; play_slide('C:\\Users\\胥晓冬\\OneDrive\\Exchange\\嘉环展厅控制方案\\ppt-test.pptx')"
 
 python -c "from player.slide_player import next_page; next_page()"
@@ -22,6 +25,7 @@ python -c "from player.slide_player import next_page; next_page()"
 python -c "from player.slide_player import prev_page; prev_page()"
 
 python -c "from player.slide_player import stop_slide; stop_slide()"
+
 
 ## 测试 VLC 播放功能
 
@@ -102,3 +106,5 @@ mosquitto_sub -h 106.14.186.252 -p 59145 -u b2tYLGnXbHUP8Gm2fWrR -t "v1/devices/
     mosquitto_pub -h $BROKER -p $PORT -t "$RESPONSE_TOPIC" -m "$response"
     echo "已发送响应: $response"
 done
+
+

@@ -1,15 +1,22 @@
+from logging import Logger
+
+
 import json
 import player
 import logging
-logger = logging.getLogger(__name__)
+from common import get_device_name
+logger: Logger = logging.getLogger(get_device_name())
 
 def handle_rpc(tb_client, msg):
     topic = msg.topic
     request_id = topic.split("/")[-1]
-    payload = json.loads(msg.payload.decode())
+    try:
+        payload = json.loads(msg.payload.decode("utf-8"))
+    except Exception as e:
+        logger.error(f"解析RPC负载失败: {e}")
+        return None
 
-    logger.debug(f"RPC请求内容: {payload}")
-
+    logger.info(f"RPC请求内容: {json.dumps(payload)}")
     method = payload.get("method")
     params = payload.get("params", {})
 
@@ -19,8 +26,9 @@ def handle_rpc(tb_client, msg):
         if hasattr(player, method):
             func = getattr(player, method)
         if func is None:
-            raise Exception(f"未知的RPC方法: {method}")
-        
+            logger.warning(f"未知的RPC方法: {method}")
+            return None
+
         # 调用函数
         if params:
             func(**params)
@@ -29,5 +37,6 @@ def handle_rpc(tb_client, msg):
 
         tb_client.reply_rpc(request_id, {"result": "ok"})
     except Exception as e:
+        logger.error(f"RPC方法调用失败: {e}")
         tb_client.reply_rpc(request_id, {"error": str(e)})
 

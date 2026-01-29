@@ -1,5 +1,7 @@
 import pyautogui
-
+import logging
+from common import get_device_name
+logger = logging.getLogger(get_device_name())
 
 def key_press(key: str | list[str]):
     """
@@ -16,8 +18,10 @@ def key_press(key: str | list[str]):
 
     try:
         if type(key) == list:
+            logger.info(f"组合键调用: {key}")
             pyautogui.hotkey(*key)
         else:
+            logger.info(f"单键调用: {key}")
             pyautogui.press(key)
     except Exception as e:
-        raise Exception(f"按键失败: {key}, 错误: {str(e)}")
+        logger.error(f"按键失败: {key}, 错误: {str(e)}")

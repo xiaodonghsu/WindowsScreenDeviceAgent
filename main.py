@@ -32,7 +32,7 @@ if device_name == "":
     # 初始化日志
     logger = setup_logger(__name__)
     logger.error("未提供设备名称, 可以在环境变量中设置: IOT_DEVICE_NAME")
-    exit(1)
+    sys.exit(1)
 else:
     # 初始化日志
     logger = setup_logger(device_name)
@@ -43,53 +43,62 @@ if cms_baseurl == "":
     cms_baseurl = get_cms_baseurl()
 if cms_baseurl == "":
     logger.error("未提供CMS API地址, 可以在环境变量中设置 CMS_BASEURL")
-    exit(1)
+    sys.exit(1)
 
-# 从服务器下载令牌
+# 从参数获取令牌
 cms_token = args.cms_token
 if cms_token == "":
     cms_token = get_cms_token(cms_baseurl)
+# 尝试从服务器下载令牌
 if cms_token == "":
     logger.error("未查询到CMS服务令牌,检查CMS服务器中的配置")
-    exit(1)
+    sys.exit(1)
 
-config  = download_config(cms_baseurl, device_name, cms_token)
-
-if config is None:
-    logger.error("下载配置失败")
-    exit(1)
-
-# 加载配置文件,连接ThingsBoard
-
-iot_host = config["iot_host"]
-iot_port = config["iot_port"]
-device_token = config["iot_device_token"]
+# 循环过程, 保证配置文件下载成功, 且能够正常连接到ThingsBoard
+# 1. 从服务器下载配置
+# 2. 连接ThingsBoard
 while True:
-    try:
-        tb = ThingsBoardClient(
-            host=iot_host,
-            port=iot_port,
-            token=device_token 
-        )
-        logger.info(f"ThingsBoard客户端已连接到 {iot_host}:{iot_port}")
-        break
-    except Exception as e:
-        logger.error(f"连接到ThingsBoard {iot_host}:{iot_port} 失败: {e}")
-        time.sleep(1)
+    config  = download_config(cms_baseurl, device_name, cms_token)
+
+    if config is None:
+        logger.error("下载配置失败")
+    else:
+        logger.info(f"下载配置成功: {config}")
+        # 加载配置文件,连接ThingsBoard
+
+        iot_host = config["iot_host"]
+        iot_port = config["iot_port"]
+        device_token = config["iot_device_token"]
+
+        try:
+            tb = ThingsBoardClient(
+                host=iot_host,
+                port=iot_port,
+                token=device_token 
+            )
+            logger.info(f"ThingsBoard客户端已连接到 {iot_host}:{iot_port}")
+            break
+        except Exception as e:
+            logger.error(f"连接到ThingsBoard {iot_host}:{iot_port} 失败: {e}")
+    logger.info(f"5秒后重试")
+    time.sleep(5)
 
 logger.info("发送设备属性")
 tb.send_attributes(get_device_attributes())
 
-logger.info("启动 MQTT 客户端监听消息")
+
 def on_message(client, userdata, msg):
-    logger.info(f"收到消息，主题: {msg.topic}, 负载: {msg.payload}")
-    if msg.topic.endswith("/rpc"):
+    logger.info(f"收到消息，主题: {msg.topic}, 负载: {msg.payload.decode("utf-8")}")
+    if msg.topic.find("/rpc") > 0:
+        logger.info(f"收到RPC消息")
         handle_rpc(tb, msg)
-    elif "/attributes" in msg.topic:
+    elif msg.topic.find("/attributes") > 0:
+        logger.info(f"收到属性消息")
         handle_attributes(tb, msg)
     else:
         logger.info(f"未知消息，主题: {msg.topic}")
 
+logger.info("启动 MQTT 客户端监听消息")
 tb.start(on_message)
 
 # logger.info("请求场景")
@@ -104,24 +113,25 @@ while True:
         scene = tb.attributes["scene"]
         break
     if loop_count > 30:
-        logger.error("场景请求超时")
+        logger.warning("场景请求超时")
         break
     loop_count += 1
 
 logger.info(f"场景: {scene}, 开始下载资源数据")
 
 # 下载场景-资源数据
-scene_assets = download_assets(scene_name=scene)
+assets = download_assets(scene_name=scene)
 
-if scene_assets is None:
+if assets is None:
     logger.error(f"场景: {scene}, 未适配到合适的资源数据.")
     if scene != "default":
-        scene_assets = download_assets(scene_name="default")
-        if scene_assets is None:
+        assets = download_assets(scene_name="default")
+        if assets is None:
             logger.error(f"场景: {scene}, 未适配到合适的资源数据.")
 
-if not scene_assets is None:
-    logger.info(f"适配到的资源数据: {scene_assets}.")
+if not assets is None:
+    logger.info(f"适配到的资源数据: {assets}.")
+    tb.send_telemetry(data=assets)
 
 heartbeat_interval = config['config']['device']['heartbeat_interval']
 logger.info(f"设备状态监控已启动，心跳间隔: {heartbeat_interval}秒")
@@ -131,10 +141,11 @@ while True:
         if data:
             tb.send_telemetry(data=data)
             logger.debug("设备遥测数据已发送")
-        data=load_assets()
-        if data:
-            tb.send_telemetry(data=data)
-            logger.debug("设备遥测数据已发送")
+        new_assets=load_assets()
+        if new_assets != assets:
+            assets = new_assets
+            tb.send_telemetry(data=assets)
+            logger.debug("设备资源数据已更新并发送")
     except Exception as e:
         logger.error(f"发送遥测数据失败: {e}")
 

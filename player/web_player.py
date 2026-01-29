@@ -9,7 +9,8 @@ import websocket
 import json
 import time
 import logging
-logger = logging.getLogger(__name__)
+from common import get_device_name
+logger = logging.getLogger(get_device_name())
 
 class WebPlayer:
     def __init__(self, browser_exe_file:str="", debug_port:int=9222):
@@ -186,7 +187,7 @@ class WebPlayer:
 
 
 def open_url(url:str) -> dict[str, str]:
-    logger.info("浏览网页", url)
+    logger.info(f"浏览网页{url}")
     wp = WebPlayer()
     if not wp.start_browser(url):
         return {"result": "fail"}

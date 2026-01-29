@@ -5,18 +5,18 @@ from common import get_device_name
 from common.config import CONFIG_FILE
 ASSETS_FILE = "assets.json"
 
-def get_cms_baseurl(key:str="CMS_BASEURL") -> str | None:
+def get_cms_baseurl(key:str="CMS_BASEURL") -> str:
     # 读取环境变量参数
     import os
     val = ""
     if not os.getenv(key) is None:
         val = os.getenv(key)
-        return val  
+        return val
     _ = load_dotenv()
     if not os.getenv(key) is None:
         val = os.getenv(key)
-        return val  
-    return None
+        return val
+    return ""
 
 def load_assets(assets_path:str=ASSETS_FILE):
     try:
