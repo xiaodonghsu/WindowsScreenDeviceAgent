@@ -1,6 +1,6 @@
 import pyautogui
 import logging
-from common import get_device_name
+from common.config import get_device_name
 logger = logging.getLogger(get_device_name())
 
 def key_press(key: str | list[str]):

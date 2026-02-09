@@ -1,9 +1,9 @@
 import requests
 import json
 from dotenv import load_dotenv
-from common import get_device_name
+from common.config import get_device_name
 from common.config import CONFIG_FILE
-ASSETS_FILE = "assets.json"
+PROGRAM_FILE = "program.json"
 
 def get_cms_baseurl(key:str="CMS_BASEURL") -> str:
     # 读取环境变量参数
@@ -18,7 +18,7 @@ def get_cms_baseurl(key:str="CMS_BASEURL") -> str:
         return val
     return ""
 
-def load_assets(assets_path:str=ASSETS_FILE):
+def load_program(assets_path:str=PROGRAM_FILE):
     try:
         with open(assets_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -43,6 +43,29 @@ def get_cms_token(cms_baseurl:str="") -> str:
         return None
     cms_token =response_json.get("data", None).get("token", "") 
     return cms_token
+
+def download_cms_scene_name(cms_baseurl:str="", device_name:str="", cms_token:str=""):
+    # API: /api/active-scene/name
+    # return: {
+    #    "name": "default"
+    # }
+    if cms_baseurl == "":
+        cms_baseurl =  get_cms_baseurl()
+    if device_name == "":
+        device_name = get_device_name()
+    if cms_token == "":
+        cms_token = get_cms_token(cms_baseurl)
+
+    url: str = f"{cms_baseurl}/active-scene/name"
+    # headers: dict = {'Authorization': f'Bearer {cms_token}'}
+
+    # 发送请求
+    # response = requests.get(url=url, headers=headers)
+    response = requests.get(url=url)
+    if response.status_code != 200:
+        return None
+    response_json = response.json()
+    return response_json.get("name", None)
 
 def download_config(cms_baseurl:str="", device_name:str="", cms_token:str="", config_path:str=CONFIG_FILE):
     if cms_baseurl == "":
@@ -75,9 +98,10 @@ def download_config(cms_baseurl:str="", device_name:str="", cms_token:str="", co
 
     return response_json.get("data")[0]
 
-def download_assets(cms_baseurl:str="", device_name:str="", scene_name:str="default", cms_token:str="", assets_file = ASSETS_FILE):
+def download_programs(cms_baseurl:str="", device_name:str="", scene_name:str="default", cms_token:str="", program_file = PROGRAM_FILE):
     '''
     从CMS下载当前设备指定场景的配置资源文件
+    包括资源列表，以及资源文件，提前缓冲。
     '''
     if cms_baseurl == "":
         cms_baseurl = get_cms_baseurl() 
@@ -86,16 +110,14 @@ def download_assets(cms_baseurl:str="", device_name:str="", scene_name:str="defa
     if cms_token == "":
         cms_token = get_cms_token(cms_baseurl)
 
-    # 从 cms_baseurl 的中获取根路径 http://192.168.41.135:1337
+    # 从 cms_baseurl 的中获取根路径 http://192.168.4.244:1337
     root_url = "/".join(cms_baseurl.split("/")[:3])
 
-
-    url: str = f"{cms_baseurl}/screen-scene-assets"
+    url: str = f"{cms_baseurl}/screen-scene-programs"
     params = {
         "filters[screen][name][$eq]": device_name,
         "filters[scene][name][$eq]": scene_name,
-        "sort": "order:asc",
-        "populate[asset][populate]": "media"
+        "populate[programs][populate]": "media"
     }
     headers: dict = {'Authorization': f'Bearer {cms_token}'}
 
@@ -105,33 +127,33 @@ def download_assets(cms_baseurl:str="", device_name:str="", scene_name:str="defa
     if response.status_code != 200:
         return None
     response_json = response.json()
-    if response_json.get("data", []) == []:
-        return None
-    assets_data = {"scene": scene_name, "assets": []}
+    print(response_json)
+    programs_data = {"scene": scene_name, "programs": []}
     for item in response_json.get("data", []):
-        key = item["asset"]["name"]
-        item_type = item["asset"]["type"]
-        item_url = ""
-        if item["asset"]["media"] is None:
-            item_url = item["asset"]["url"]
-        else:
-            item_url = root_url + item["asset"]["media"]["url"]
-        item_config = item["asset"].get("config", {})
-        local_file = ""
+        for program in item["programs"]:
+            key = program["name"]
+            item_type = program["type"]
+            item_url = ""
+            if item_type == "webpage":
+                item_url = program["url"]
+            else:
+                item_url = root_url + program["media"]["url"]
+            item_config = program.get("config", {})
+            local_file = ""
 
-        # 如果item_type 不是 webpage, 将文件下载到本地临时目录中
-        if item_type != "webpage":
-            # 下载文件到临时目录中
-            local_file = download_file(item_url)
+            # 如果item_type 不是 webpage, 将文件下载到本地临时目录中
+            if item_type != "webpage":
+                # 下载文件到临时目录中
+                local_file = download_file(item_url)
 
-        assets_data["assets"].append({"name": key,
-                            "type": item_type,
-                            "url": item_url,
-                            "file": local_file,
-                            "config": item_config})
-    with open(assets_file, "w", encoding="utf-8") as f:
-        json.dump(assets_data, f,ensure_ascii=False)
-    return assets_data
+            programs_data["programs"].append({"name": key,
+                                "type": item_type,
+                                "url": item_url,
+                                "file": local_file,
+                                "config": item_config})
+    with open(program_file, "w", encoding="utf-8") as f:
+        json.dump(programs_data, f,ensure_ascii=False)
+    return programs_data
 
 def download_file(url: str) -> str:
     """Download file from URL and save it to temporary directory"""
@@ -146,7 +168,7 @@ def download_file(url: str) -> str:
     
     response = requests.get(url)
     if response.status_code == 200:
-        with open(local_file, 'wb', encoding='utf-8') as f:
+        with open(local_file, 'wb') as f:
             f.write(response.content)
         return local_file
     return ""

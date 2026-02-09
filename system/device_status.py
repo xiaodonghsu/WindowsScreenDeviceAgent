@@ -64,5 +64,4 @@ def get_device_status():
     status.cpu_percent = psutil.cpu_percent()
     status.memory_percent = psutil.virtual_memory().percent
     status.network = get_network_status()
-    
     return asdict(status)

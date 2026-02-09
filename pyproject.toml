@@ -5,17 +5,18 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "dacite>=1.9.2",
     "paho-mqtt>=2.1.0",
     "psutil>=7.2.1",
     "pyautogui>=0.9.54",
     "pyinstaller>=6.18.0",
     "python-dotenv>=1.2.1",
-    "python-vlc>=3.0.21203",
     "pywin32>=311",
     "pywinauto>=0.6.9",
     "requests>=2.32.5",
     "screeninfo>=0.8.1",
     "websocket-client>=1.9.0",
+    "websockets>=16.0",
 ]
 
 [build-system]

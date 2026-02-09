@@ -26,14 +26,14 @@ from logging import Logger
 
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional
 
 import pywintypes
 import win32com.client
 import pythoncom
 import logging
-from common import get_device_name
+from common.config import get_device_name
 logger: Logger = logging.getLogger(get_device_name())
 
 APP_PROGIDS = ("Kwpp.Application", "PowerPoint.Application")
@@ -64,8 +64,9 @@ class SlidePlayerController:
         for progid in self._progids:
             try:
                 return win32com.client.GetActiveObject(progid), progid
-            except pywintypes.com_error:
-                continue
+            except Exception as e:
+                # logger.warning(f"尝试获取正在运行的{progid}失败: {e}")
+                pass
         return None, None
 
     def _dispatch_app(self, progid: str):
@@ -142,7 +143,6 @@ class SlidePlayerController:
             return status
         status.is_running = True
         status.app_name = progid
-        print(app.Visible)
         status.is_visible: bool = False if app.Visible == 0 else True
 
         presentation = self._get_active_presentation(app)
@@ -151,17 +151,22 @@ class SlidePlayerController:
                 status.file_path = presentation.FullName
             except pywintypes.com_error:
                 pass
-
         status.current_slide_index = self._get_active_window_slide_index(app)
-        status.is_presenting, status.show_slide_index = self._get_show_state(app)
+        status.is_presenting, status.current_show_slide_index = self._get_show_state(app)
         return status
 
     def start_play(self, file_path: str, start_slide: int = 1) -> None:
+        # 获取slide应用程序对象
         app, _ = self._get_or_start_app()
+        if app is None:
+            return
+        # 检查需要播放的文件是否已经加载
         presentation = self._get_presentation_by_path(app, file_path)
         if presentation is None:
+            # 没有加载则加载
             presentation = app.Presentations.Open(file_path, WithWindow=True)
         try:
+            # 否则直接激活窗口
             presentation.Windows(1).Activate()
         except pywintypes.com_error:
             pass
@@ -206,7 +211,7 @@ class SlidePlayerController:
 
 def get_status():
     controller = SlidePlayerController()
-    return controller.get_status()
+    return asdict(controller.get_status())
 
 def play_slide(url: str, startPage: int = 1):
     controller = SlidePlayerController()

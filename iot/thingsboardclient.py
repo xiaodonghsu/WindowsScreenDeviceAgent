@@ -29,7 +29,7 @@ class ThingsBoardClient:
             json.dumps(data)
         )
 
-    def request_attributes(self, keys: dict):
+    def request_shared_attributes(self, keys: dict):
         req_id = self._req_id
         self._req_id += 1
         topic = f"v1/devices/me/attributes/request/{req_id}"

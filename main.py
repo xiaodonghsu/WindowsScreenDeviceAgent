@@ -1,9 +1,13 @@
 from math import log
+from nt import scandir
 import time
-from cms import download_config, download_assets, load_assets
-from common import load_config, get_device_name
+from tkinter import N
+from cms import download_config, download_programs, load_program
+from cms.program import download_cms_scene_name
+from common.config import get_device_name
 from iot import ThingsBoardClient
 from iot.handler import handle_rpc, handle_attributes
+from player import slide_player
 from system.device_status import get_device_status
 from system.device_attr import get_device_attributes
 from common.logger import setup_logger
@@ -28,6 +32,7 @@ args = parser.parse_args()
 device_name = args.device_name
 if device_name == "":
     device_name = get_device_name()
+
 if device_name == "":
     # 初始化日志
     logger = setup_logger(__name__)
@@ -37,10 +42,13 @@ else:
     # 初始化日志
     logger = setup_logger(device_name)
 
-# 从服务器下载配置
+logger.info(f"本地设备名称: {device_name}")
+
+# 获取服务器配置
 cms_baseurl = args.cms_baseurl
 if cms_baseurl == "":
     cms_baseurl = get_cms_baseurl()
+logger.info(f"CMS服务器地址: {cms_baseurl}")
 if cms_baseurl == "":
     logger.error("未提供CMS API地址, 可以在环境变量中设置 CMS_BASEURL")
     sys.exit(1)
@@ -83,10 +91,12 @@ while True:
     logger.info(f"5秒后重试")
     time.sleep(5)
 
+# 到这里的时候设备已经联网,开始正式工作
+
 logger.info("发送设备属性")
 tb.send_attributes(get_device_attributes())
 
-
+# 端侧的核心工作: 监听服务端的消息, 处理一些TOPIC
 def on_message(client, userdata, msg):
     logger.info(f"收到消息，主题: {msg.topic}, 负载: {msg.payload.decode("utf-8")}")
     if msg.topic.find("/rpc") > 0:
@@ -98,54 +108,53 @@ def on_message(client, userdata, msg):
     else:
         logger.info(f"未知消息，主题: {msg.topic}")
 
-logger.info("启动 MQTT 客户端监听消息")
 tb.start(on_message)
+logger.info("已启动 MQTT 客户端监听消息")
 
-# logger.info("请求场景")
-tb.request_attributes(["scene"])
+logger.info("请求共享参数场景")
+tb.request_shared_attributes(["scene"])
 
-# 循环0.1秒 * 30次，读取场景
-loop_count = 0
-scene = "default"
-while True:
-    time.sleep(0.1)
-    if "scene" in tb.attributes:
-        scene = tb.attributes["scene"]
-        break
-    if loop_count > 30:
-        logger.warning("场景请求超时")
-        break
-    loop_count += 1
+# scene_name = download_cms_scene_name()
+# logger.info(f"获取到的场景名称: {scene_name}")
 
-logger.info(f"场景: {scene}, 开始下载资源数据")
+# if scene_name is None:
+#     scene_name = "default"
+# logger.info(f"设置激活场景: {scene_name}")
+# tb.send_attributes({"scene": scene_name})
 
-# 下载场景-资源数据
-assets = download_assets(scene_name=scene)
-
-if assets is None:
-    logger.error(f"场景: {scene}, 未适配到合适的资源数据.")
-    if scene != "default":
-        assets = download_assets(scene_name="default")
-        if assets is None:
-            logger.error(f"场景: {scene}, 未适配到合适的资源数据.")
-
-if not assets is None:
-    logger.info(f"适配到的资源数据: {assets}.")
-    tb.send_telemetry(data=assets)
-
-heartbeat_interval = config['config']['device']['heartbeat_interval']
-logger.info(f"设备状态监控已启动，心跳间隔: {heartbeat_interval}秒")
+heartbeat_interval = config['iot_heartbeat_interval']
+logger.info(f"启动设备状态周期上报，心跳间隔: {heartbeat_interval}秒")
+assets = {}
+player_staus = {"video_player": {},"web_player": {},"slide_player":{}}
 while True:
     try:
+        # 周期性例程: 更新设备参数
         data=get_device_status()
         if data:
             tb.send_telemetry(data=data)
             logger.debug("设备遥测数据已发送")
-        new_assets=load_assets()
-        if new_assets != assets:
-            assets = new_assets
-            tb.send_telemetry(data=assets)
-            logger.debug("设备资源数据已更新并发送")
+        # 选择性更新的参数
+        # video_player
+        from player import get_video_player_status
+        status = get_video_player_status()
+        if status:
+            if not player_staus["video_player"] == status:
+                tb.send_telemetry(data={"video_player": status})
+                player_staus["video_player"] = status
+        # web_player
+        from player import get_web_player_status
+        status = get_web_player_status()
+        if status:
+            if not player_staus["web_player"] == status:
+                tb.send_telemetry(data={"web_player": status})
+                player_staus["web_player"] = status
+        # slide_player
+        from player import get_slide_player_status
+        status = get_slide_player_status()
+        if status:
+            if not player_staus["slide_player"] == status:
+                tb.send_telemetry(data={"slide_player": status})
+                player_staus["slide_player"] = status
     except Exception as e:
         logger.error(f"发送遥测数据失败: {e}")
 

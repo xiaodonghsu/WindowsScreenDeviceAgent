@@ -4,7 +4,7 @@ from logging import Logger
 import json
 import player
 import logging
-from common import get_device_name
+from common.config import get_device_name
 logger: Logger = logging.getLogger(get_device_name())
 
 def handle_rpc(tb_client, msg):

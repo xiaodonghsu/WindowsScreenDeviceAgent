@@ -21,8 +21,9 @@ def setup_logger(name="avatar-player", log_dir="logs", level=logging.INFO):
         os.makedirs(log_dir)
     
     # 生成带时间戳的日志文件名
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    log_file = os.path.join(log_dir, f"{name}-{timestamp}.log")
+    # timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y%m%d")
+    log_file = os.path.join(log_dir, f"device_{name}_{timestamp}.log")
     
     # 创建日志记录器
     logger = logging.getLogger(name)

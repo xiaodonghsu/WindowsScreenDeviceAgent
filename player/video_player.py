@@ -63,23 +63,24 @@
 
 ''' 
 
+import re
 from typing import Any
 
 
 import os
 import socket
 import subprocess
+import psutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
-from common.config import load_config
 import logging
-from common import get_device_name
+from common.config import get_device_name
 logger = logging.getLogger(get_device_name())
 
 @dataclass
-class VLCConfig:
-    vlc_exe: str = "vlc.exe"
+class VideoPlayerConfig:
+    exe: str = "vlc.exe"
     host: str = "127.0.0.1"
     port: int = 9999
     fullscreen: bool = True
@@ -87,38 +88,29 @@ class VLCConfig:
     no_title: bool = True
 
 @dataclass
-class VLCStatus:
+class VideoPlayerStatus:
     is_running: bool = False
     is_playing: bool = False
-    state: str = None                 # playing / paused / stopped / unknown
-    media: str = None          # 当前播放的文件或URL
+    state: str = ""                 # playing / paused / stopped / unknown
+    media: str = ""          # 当前播放的文件或URL
     position_sec: int = -1   # 当前播放时间（秒）
     duration_sec: int = -1   # 总时长（秒）
     progress: float = 0.0     # 0.0 ~ 1.0
 
-class VLCRemote:
+class VideoPlayerRemote:
     """
-    方案D：独立启动 VLC.exe + 通过 RC(TCP) 控制
-    Python 退出后 VLC 仍继续运行（因为是独立进程）
+    方案D：独立启动 VideoPlayer.exe + 通过 RC(TCP) 控制
+    Python 退出后 VideoPlayer 仍继续运行（因为是独立进程）
     """
 
     def __init__(self) -> None:
-        self.config = VLCConfig()
-        # 读取配置文件
-        config: dict[str, dict[str, str|int]] = load_config()
-        config = config.get("config")
-        self.config.vlc_exe = config.get('player', {}).get('videoplayer', {}).get('exe', 'vlc.exe')
-        self.config.host = config.get('player', {}).get('videoplayer', {}).get('host', '127.0.0.1')
-        self.config.port = config.get('player', {}).get('videoplayer', {}).get('port', 9999)
-
-        if not os.path.exists(self.config.vlc_exe):
-            raise FileNotFoundError(f"vlc.exe not found: {self.config.vlc_exe}")
+        self.config = VideoPlayerConfig()
         self._proc: subprocess.Popen | None = None
 
     # ---------- 基础：发送 RC 命令 ----------
-    def _send_rc(self, command: str, timeout: float = 0.8, wait_return: bool = False) -> None:
+    def _send_rc(self, command: str, timeout: float = 0.8, wait_return_time: float = 0.1):
         """
-        向 VLC RC 端口发送命令。VLC 没启动/端口没开会抛异常。
+        向 VideoPlayer RC 端口发送命令。VideoPlayer 没启动/端口没开会抛异常。
         Socket 保存为内部变量,读取操作可获得返回结果。
         """
         # with socket.create_connection((self.config.host, self.config.port), timeout=timeout) as s:
@@ -126,48 +118,200 @@ class VLCRemote:
         try:
             with socket.create_connection((self.config.host, self.config.port), timeout=timeout) as s:
                 s.sendall((command.strip() + "\n").encode("utf-8"))
-                if wait_return:
-                    time.sleep(0.1)
+                if wait_return_time > 0:
+                    time.sleep(wait_return_time)
                     data = s.recv(8192)
                     return data.decode("utf-8", errors="ignore")
         except socket.error as e:
-            raise OSError(f"Failed to send RC command to VLC: {e}") from e
+            logger.error(f"Failed to send RC command to VideoPlayer: {e}")
+            return None
+
+    def _send_rc_list(self, command_list: list[str], timeout: float = 0.8, wait_return_time: float = 0.1) -> list[str|None] | None:
+        """
+        向 VideoPlayer RC 端口发送命令。VideoPlayer 没启动/端口没开会抛异常。
+        Socket 保存为内部变量,读取操作可获得返回结果。
+        """
+        # with socket.create_connection((self.config.host, self.config.port), timeout=timeout) as s:
+        #     ret = s.sendall((command.strip() + "\n").encode("utf-8"))
+        response = []
+        try:
+            s = socket.create_connection((self.config.host, self.config.port), timeout=timeout)
+        except socket.error as e:
+            return None
+        for command in command_list:
+            try:
+                s.sendall((command.strip() + "\n").encode("utf-8"))
+                if wait_return_time > 0:
+                    time.sleep(wait_return_time)
+                    data = s.recv(8192)
+                    response.append( data.decode("utf-8", errors="ignore"))
+            except socket.error as e:
+                logger.error(f"Failed to send RC command to VideoPlayer: {e}")
+                response.append( None)
+        return response
+
+    def send_command(self, command: str, timeout: float = 0.8, wait_return_time: float = 0.1):
+        response = self._send_rc(command, timeout, wait_return_time)
+        return response
 
     # 获取vlc的当前状态以及正在播放的内容和进度
-    def get_status(self) -> VLCStatus:
+    def get_status(self) -> VideoPlayerStatus:
         # 初始化
-        status = VLCStatus()
+        status = VideoPlayerStatus()
         # 读取运行状态
         status.is_running = self.is_running()
         if not status.is_running:
             return status
         # 读取播放状态
-        response = self._send_rc("is_playing", wait_return=True)
-        status.is_playing = True if int(response.strip())==1 else False
+        response = self._send_rc("is_playing").strip()
+        status.is_playing = True if int(response)==1 else False
         # 读取当前位置
-        status.position_sec = int(self._send_rc("get_time", wait_return=True).strip())
+        response = self._send_rc("get_time").strip()
+        try:
+            status.position_sec = int(response)
+        except ValueError:
+            pass
         # 读取总长度
-        status.duration_sec = int(self._send_rc("get_length", wait_return=True).strip())
+        response = self._send_rc("get_length").strip()
+        try:
+            status.duration_sec = int(response)
+        except ValueError:
+            pass
         # 读取进度
         if status.duration_sec > 0:
             status.progress = int(10000 * status.position_sec / status.duration_sec)/100
         else:
             status.progress = 0.0
         # 读取标题
-        status.media = self._send_rc("get_title", wait_return=True).strip()
+        status.media = self._send_rc("get_title").strip()
         # 获取状态
-        response = self._send_rc("status", wait_return=True)
+        response = self._send_rc("status")
+        '''
+        status 命令返回值:
+        ## 典型播放状态
+        status change: ( new input: file:///D:/Files/Downloads/xunjian.mp4 )
+        status change: ( audio volume: 269 )
+        status change: ( play state: 3 )
+        status: returned 0 (no error)
+
+        ## 典型暂停状态(暂停后第一次查询)
+        status change: ( pause state: 4 )
+        输入“pause”可继续。
+        status: returned 0 (no error)
+
+        ## (暂停后再次查询)
+        输入“pause”可继续。
+        status: returned 0 (no error)
+
+        ## 停止状态
+        status change: ( audio volume: 269 )
+        status change: ( stop state: 5 )
+        status: returned 0 (no error)
+
+
+        '''
         for line in response.splitlines():
             logger.debug(line)
+            m = re.compile(pattern = r'\((.*?)\)').search(line)
+            if m:
+                if ":" in m.group(1):
+                    key, value = m.group(1).split(": ", maxsplit=1)
+                    if key.endswith("state"):
+                        status.state = key.strip().split(" ")[0]
+                        break
+            else:
+                if "pause" in line:
+                    status.state = "pause"
+                    break
             # key, value = line.split(": ", maxsplit=1)
             # status[key] = value
         return status
+
+# 获取vlc的当前状态以及正在播放的内容和进度
+    def get_status_list(self) -> VideoPlayerStatus:
+        # 初始化
+        status = VideoPlayerStatus()
+        # 读取运行状态
+        status.is_running = self.is_running()
+        if not status.is_running:
+            return status
+        command_list = ["is_playing", "get_time", "get_length", "get_title", "status"]
+        response = self._send_rc_list(command_list)
+        if response is None:
+            return status
+        # 读取播放状态
+        try:
+            status.is_playing =  True if int(response[0].strip().splitlines()[0].strip())==1 else False
+        except:
+            pass
+        # 读取当前位置
+        try:
+            status.position_sec = int(response[1].strip().splitlines()[0].strip())
+        except ValueError:
+            pass
+        # 读取总长度
+        try:
+            status.duration_sec = int(response[2].strip().splitlines()[0].strip())
+        except ValueError:
+            pass
+        # 计算进度
+        if status.duration_sec > 0:
+            status.progress = int(10000 * status.position_sec / status.duration_sec)/100
+        else:
+            status.progress = 0.0
+        # 读取标题
+        try:
+            status.media = response[3].strip().splitlines()[0].strip()
+        except:
+            pass
+        # 获取状态
+        '''
+        status 命令返回值:
+        ## 典型播放状态
+        status change: ( new input: file:///D:/Files/Downloads/xunjian.mp4 )
+        status change: ( audio volume: 269 )
+        status change: ( play state: 3 )
+        status: returned 0 (no error)
+
+        ## 典型暂停状态(暂停后第一次查询)
+        status change: ( pause state: 4 )
+        输入“pause”可继续。
+        status: returned 0 (no error)
+
+        ## (暂停后再次查询)
+        输入“pause”可继续。
+        status: returned 0 (no error)
+
+        ## 停止状态
+        status change: ( audio volume: 269 )
+        status change: ( stop state: 5 )
+        status: returned 0 (no error)
+
+
+        '''
+        for line in response[4].strip().splitlines():
+            logger.debug(msg=line)
+            m = re.compile(pattern = r'\((.*?)\)').search(line)
+            if m:
+                if ":" in m.group(1):
+                    key, value = m.group(1).split(": ", maxsplit=1)
+                    if key.endswith("state"):
+                        status.state = key.strip().split(" ")[0]
+                        break
+            else:
+                if "pause" in line:
+                    status.state = "pause"
+                    break
+            # key, value = line.split(": ", maxsplit=1)
+            # status[key] = value
+        return status
+
 
     def get_playlist(self) -> str | None:
         """
         从 playlist 输出中提取当前播放的媒体路径/URL
         """
-        response = self._send_rc("playlist", wait_return=True)
+        response = self._send_rc("playlist")
         logger.debug(response)
         # 示例： |  *0 - file:///D:/videos/demo.mp4
         for line in response.splitlines():
@@ -176,75 +320,136 @@ class VLCRemote:
         return None
 
     def is_running(self) -> bool:
-        try:
-            response = self._send_rc("help", timeout=0.2, wait_return=True)
-            logger.debug(response)
-            return True
-        except OSError:
+        if len(self.get_processes_by_name(self.config.exe)) == 0:
             return False
+        if self._send_rc("help") is None:
+            return False
+        return True
 
-    # ---------- 启动 VLC（独立进程） ----------
-    def start_vlc(self, media_path: str | None = None) -> None:
+    def get_processes_by_name(self, exe_name=None) -> list[int]:
         """
-        启动 VLC.exe 并开启 RC 接口。
+        获取正在运行的 VideoPlayer 进程的 PID
+        """
+        if exe_name is None:
+            exe_name = self.config.exe
+        player_exe_basename = os.path.basename(exe_name)
+        processes = []
+        for proc in psutil.process_iter():
+            if proc.name() == player_exe_basename:
+                processes.append(proc.pid)
+        return processes
+
+    def kill_processes_by_name(self, exe_name=None) -> None:
+        """
+        杀死所有正在运行的 VideoPlayer 进程
+        """
+        if exe_name is None:
+            exe_name = self.config.exe
+        player_exe_basename = os.path.basename(exe_name)
+        for proc in psutil.process_iter():
+            if proc.name() == player_exe_basename:
+                try:
+                    proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    pass
+
+    # ---------- 启动 VideoPlayer（独立进程） ----------
+    def start_vlc(self, timeout: int = 5) -> bool:
+        """
+        启动 VideoPlayer.exe 并开启 RC 接口。
         如果 media_path 不为空，则启动后直接播放该媒体。
         """
-        if not os.path.isfile(self.config.vlc_exe):
-            raise FileNotFoundError(f"vlc.exe not found: {self.config.vlc_exe}")
+        # 读取配置文件
+        if not os.path.exists(self.config.exe):
+            from system.config import get_app_path
+            app_path = get_app_path(self.config.exe)
+            if os.path.exists(app_path):
+                self.config.exe = app_path
+            else:
+                logger.error(f"{self.config.exe} not found")
+                raise FileNotFoundError(f"{self.config.exe} not found")
 
-        cmd = [
-            self.config.vlc_exe,
-            "--intf", "dummy",                 # 无需VLC主UI交互也能播放（更像播放器服务）
-            "--extraintf", "rc",
-            "--rc-host", f"{self.config.host}:{self.config.port}",
-            "--rc-quiet",                      # 减少输出
-        ]
 
-        if self.config.fullscreen:
-            cmd.append("--fullscreen")
-        if self.config.loop:
-            cmd.append("--loop")
-        if self.config.no_title:
-            cmd.append("--no-video-title-show")
+        # 检查是程序是否运行
+        if self.is_running():
+            logger.info("VideoPlayer is already running")
+        else:
+            logger.info("Try to start VideoPlayer")
+            _ = self.kill_processes_by_name(exe_name=self.config.exe)
+            cmd = [
+                self.config.exe,
+                "--intf", "dummy",                 # 无需VideoPlayer主UI交互也能播放（更像播放器服务）
+                "--extraintf", "rc",
+                "--rc-host", f"{self.config.host}:{self.config.port}",
+                "--rc-quiet",                      # 减少输出
+            ]
 
-        # 如果指定媒体文件/URL，就让 VLC 直接播放它
-        if media_path:
-            cmd.append(media_path)
+            if self.config.fullscreen:
+                cmd.append("--fullscreen")
+            if self.config.loop:
+                cmd.append("--loop")
+            if self.config.no_title:
+                cmd.append("--no-video-title-show")
 
-        # 独立进程启动：Python 不等待
-        self._proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )
+            # 独立进程启动：Python 不等待
+            self._proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True
+            )
 
-        # 等待 RC 端口就绪（最多 2 秒）
-        deadline = time.time() + 2.0
-        while time.time() < deadline:
-            if self.is_running():
-                return
-            time.sleep(0.05)
+            # 等待 RC 端口就绪（最多 timeout 秒）
+            t0 = time.time()
+            while time.time()-t0 < timeout:
+                if self.is_running():
+                    logger.info(f"{self.config.exe} started and RC reached at {int((time.time()-t0)*1000)/1000} s.")
+                    return False
+                time.sleep(0.05)
 
-        # 如果没起来，多半是端口被占用或 VLC 没启动成功
-        raise RuntimeError("VLC started but RC interface not reachable. Check port/permissions.")
+            # 如果没起来，多半是端口被占用或 VideoPlayer 没启动成功
+            logger.error("VideoPlayer started but RC interface not reachable. Check port/permissions.")
+            return False
+        return True
 
-    # ---------- 你要的 5 个控制接口 ----------
+    # ---------- 5 个控制接口 ----------
     def play_video(self, media_path: str) -> None:
         """
-        如果 VLC 没启动：启动并播放
-        如果 VLC 已启动：追加并播放该媒体（用 add）
+        如果 VideoPlayer 没启动：启动并播放
+        如果 VideoPlayer 已启动：追加并播放该媒体（用 add）
         """
-        if not self.is_running():
-            self.start_vlc(media_path)
-            return
-
+        if not media_path.startswith("http"):
+            if not os.path.exists(media_path):
+                logger.error(f"media file: {media_path} not exists!")
+                return
+        retry = 2
+        while retry >=0:
+            if not self.is_running():
+                self.start_vlc()
+            else:
+                break
+            retry -= 1
         # 已在运行：用 add 播放新的媒体
-        self._send_rc(f'add "{media_path}"')
+        if self.is_running():
+            response = self._send_rc("clear")
+            logger.debug(f"clear command returned: {response}")
+            response = self._send_rc(f'add "{media_path}"')
+            logger.debug(f"add command returned: {response}")
 
     def pause_video(self) -> None:
-        self._send_rc("pause")
+        # 读取播放状态
+        response = self._send_rc("is_playing")
+        try:
+            response_code = int(response.strip())
+        except Exception as e:
+            response_code = 0
+            logger.warning(f"Unexpect response {response}. error: {e}")
+        is_playing = True if response_code == 1 else False
+        if is_playing:
+            logger.debug(f"video is playing, send pause command")
+            response = self._send_rc("pause")
+            logger.debug(f"Pause command returned: {response}")
 
     def stop_video(self) -> None:
         self._send_rc("stop")
@@ -255,26 +460,34 @@ class VLCRemote:
     def backward_video(self, seconds: int = 10) -> None:
         self._send_rc(f"seek -{seconds}")
 
-    # ---------- 可选：让 VLC 退出 ----------
+    # ---------- 可选：让 VideoPlayer 退出 ----------
     def quit_vlc(self) -> None:
         """
-        关闭 VLC（可选）。
+        关闭 VideoPlayer（可选）。
         """
         self._send_rc("quit")
 
+def get_status():
+    """
+    获取播放器状态
+    """
+    controller = VideoPlayerRemote()
+    return asdict(controller.get_status_list())
 
-def play_video(url):
-    controller = VLCRemote()
+def play_video(url, start_pause=False):
+    controller = VideoPlayerRemote()
     controller.play_video(url)
+    if start_pause:
+        controller.pause_video()
 
 def stop_video():
-    controller = VLCRemote()
+    controller = VideoPlayerRemote()
     controller.stop_video()
 
 def forward_video(seconds: int = 10):
-    controller = VLCRemote()
+    controller = VideoPlayerRemote()
     controller.forward_video(seconds)
 
 def backward_video(seconds: int = 10):
-    controller = VLCRemote()    
+    controller = VideoPlayerRemote()    
     controller.backward_video(seconds)
