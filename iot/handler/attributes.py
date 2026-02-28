@@ -21,7 +21,7 @@ def handle_attributes(tb_client, msg):
             if tb_client.attributes.get("scene", "") != scene:
                 # 处理场景变更逻辑
                 logger.info(f"处理场景变更: {scene}")
-                update_device_scene_assets(tb_client=tb_client, scene=scene)
+                update_device_scene_program(tb_client=tb_client, scene=scene)
                 # logger.info(f"设置属性: {"scene"} = {scene}")
                 # tb_client.attributes["scene"] = scene
             else:
@@ -34,7 +34,7 @@ def handle_attributes(tb_client, msg):
             for key in payload[attr_type]:
                 value = payload[attr_type][key]
                 if key == "scene":
-                    update_device_scene_assets(tb_client=tb_client, scene=value)
+                    update_device_scene_program(tb_client=tb_client, scene=value)
                 else:
                     logger.info(f"设置属性: {key} = {value}")
                     tb_client.attributes[key] = value
@@ -42,25 +42,27 @@ def handle_attributes(tb_client, msg):
         logger.warning(f"未知的属性消息: {payload}")
 
 
-def update_device_scene_assets(tb_client, scene: str):
+def update_device_scene_program(tb_client, scene: str):
     '''
     更新场景
     '''
     if tb_client.attributes.get("scene", "") != scene:
-        assets = None
-        for scene_name in [scene, "default"]:
-            logger.info(f"场景: {scene_name}, 尝试下载资源数据")
-            # 下载场景-资源数据
-            assets = download_programs(scene_name=scene_name)
-            if assets is None:
-                logger.warning(f"场景: {scene_name}, CMS未适配到合适的资源数据!")
-            else:
-                logger.info(f"场景: {scene_name}, 适配到的资源数据: {assets}.")
-                tb_client.send_telemetry(assets)
-                break
-            # default 只查询一次
-            if scene_name == "default":
-                break
+        programs = None
+        for device_name in ["", "default"]:
+            for scene_name in [scene, "default"]:
+                logger.info(f"场景: {scene_name}, 尝试下载资源数据")
+                # 下载场景-资源数据
+                programs = download_programs(device_name=device_name, scene_name=scene_name)
+                logger.info(f"节目单: {programs}")
+                if len(programs["programs"]) == 0:
+                    logger.warning(f"场景: {scene_name}, CMS未适配到合适的资源数据!")
+                else:
+                    logger.info(f"场景: {scene_name}, 适配到的资源数据: {programs}.")
+                    tb_client.send_telemetry(programs)
+                    break
+                # default 只查询一次
+                if scene_name == "default":
+                    break
         logger.info(f"设置属性: {"scene"} = {scene}")
         tb_client.attributes["scene"] = scene
         # 根据情况自动进入第一个节目!

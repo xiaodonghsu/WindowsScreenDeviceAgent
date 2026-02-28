@@ -1,1 +1,1 @@
-{"scene": "default", "programs": [{"name": "一般的PPTX样片", "type": "slide", "url": "http://192.168.4.244:1337/uploads/ppt_test_a554eaf20a.pptx", "file": "D:\\Temp\\ppt_test_a554eaf20a.pptx", "config": {}}]}
+{"scene": "default", "programs": [{"name": "浏览器节目", "type": "webpage", "url": "http://192.168.4.244/expo/?screen=default&scene=default", "file": "", "config": {}}]}

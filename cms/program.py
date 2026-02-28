@@ -1,5 +1,7 @@
+from nt import replace
 import requests
 import json
+import re
 from dotenv import load_dotenv
 from common.config import get_device_name
 from common.config import CONFIG_FILE
@@ -138,6 +140,14 @@ def download_programs(cms_baseurl:str="", device_name:str="", scene_name:str="de
                 item_url = program["url"]
             else:
                 item_url = root_url + program["media"]["url"]
+            if len(item_url) > 0:
+                mc = re.compile(r'\{\{(.*?)\}\}').findall(item_url)
+                if mc:
+                    for m in mc:
+                        if m == "screen":
+                            item_url = item_url.replace("{{" + m + "}}", device_name)
+                        if m == "scene":
+                            item_url = item_url.replace("{{" + m + "}}", scene_name)
             item_config = program.get("config", {})
             local_file = ""
 

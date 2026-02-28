@@ -1,3 +1,20 @@
+import sys
+import win32api
+import win32event
+import winerror
+
+# 防止重复启动 - 使用 Windows Mutex
+mutex = None
+
+try:
+    mutex_name = "Global\\ExpoAgent_SingleInstance_Mutex"
+    mutex = win32event.CreateMutex(None, False, mutex_name)
+    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+        print("ExpoAgent 已经在运行中，请勿重复启动")
+        sys.exit(1)
+except Exception as e:
+    print(f"创建单实例锁失败: {e}")
+
 from math import log
 from nt import scandir
 import time
@@ -13,8 +30,8 @@ from system.device_attr import get_device_attributes
 from common.logger import setup_logger
 from cms import get_cms_token, get_cms_baseurl
 # 读取参数
-
 import argparse
+
 
 # 根据命令行的参数从服务端获取配置信息
 # 参数包括:
@@ -36,7 +53,7 @@ if device_name == "":
 if device_name == "":
     # 初始化日志
     logger = setup_logger(__name__)
-    logger.error("未提供设备名称, 可以在环境变量中设置: IOT_DEVICE_NAME")
+    logger.error("未提供设备名称, 请设置.env或设置环境变量: IOT_DEVICE_NAME")
     sys.exit(1)
 else:
     # 初始化日志
@@ -50,7 +67,7 @@ if cms_baseurl == "":
     cms_baseurl = get_cms_baseurl()
 logger.info(f"CMS服务器地址: {cms_baseurl}")
 if cms_baseurl == "":
-    logger.error("未提供CMS API地址, 可以在环境变量中设置 CMS_BASEURL")
+    logger.error("未提供CMS API地址, 请设置.env或设置环境变量 CMS_BASEURL")
     sys.exit(1)
 
 # 从参数获取令牌
