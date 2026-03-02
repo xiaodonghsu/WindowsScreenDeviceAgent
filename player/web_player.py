@@ -31,7 +31,8 @@ class WebPlayerConfig:
         "--remote-debugging-port=9222",
         "--user-data-dir=%TEMP%\\ChromeDevSession",
         "--remote-allow-origins=*",
-        "--UseBasicParsing"
+        "--UseBasicParsing",
+        "--disable-features=Translate"
       ]
 
 class WebPlayer:

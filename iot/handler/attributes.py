@@ -48,21 +48,25 @@ def update_device_scene_program(tb_client, scene: str):
     '''
     if tb_client.attributes.get("scene", "") != scene:
         programs = None
-        for device_name in ["", "default"]:
+        program_matched = False
+        for device_name in [get_device_name(), "default"]:
             for scene_name in [scene, "default"]:
-                logger.info(f"场景: {scene_name}, 尝试下载资源数据")
+                logger.info(f"设备: {device_name}, 场景: {scene_name}, 尝试下载资源数据")
                 # 下载场景-资源数据
                 programs = download_programs(device_name=device_name, scene_name=scene_name)
                 logger.info(f"节目单: {programs}")
                 if len(programs["programs"]) == 0:
-                    logger.warning(f"场景: {scene_name}, CMS未适配到合适的资源数据!")
+                    logger.warning(f"设备: {device_name}, 场景: {scene_name}, CMS未适配到合适的资源数据!")
                 else:
-                    logger.info(f"场景: {scene_name}, 适配到的资源数据: {programs}.")
+                    logger.info(f"设备: {device_name}, 场景: {scene_name}, 适配到的资源数据: {programs}.")
                     tb_client.send_telemetry(programs)
+                    program_matched = True
                     break
                 # default 只查询一次
                 if scene_name == "default":
                     break
+            if program_matched:
+                break
         logger.info(f"设置属性: {"scene"} = {scene}")
         tb_client.attributes["scene"] = scene
         # 根据情况自动进入第一个节目!
