@@ -31,11 +31,11 @@ def handle_rpc(tb_client, msg):
 
         # 调用函数
         if params:
-            func(**params)
+            func_ret = func(**params)
         else:
-            func()
+            func_ret = func()
 
-        tb_client.reply_rpc(request_id, {"result": "ok"})
+        tb_client.reply_rpc(request_id, {"result": func_ret})
     except Exception as e:
         logger.error(f"RPC方法调用失败: {e}")
         tb_client.reply_rpc(request_id, {"error": str(e)})
