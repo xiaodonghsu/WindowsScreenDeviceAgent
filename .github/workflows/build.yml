@@ -1,0 +1,40 @@
+name: Build and Release EXE
+
+on:
+  push:
+    tags:
+      - 'v*'  # 只在打 tag 时触发，如 v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest  # 必须在 Windows 上打包 .exe
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'  # 根据你的需求调整
+
+    - name: Install dependencies
+      run: |
+        uv sync
+
+    - name: Build with PyInstaller
+      run: |
+        uv run pyinstaller --version-file version-info --onefile --icon favicon.ico --name ExpoAgent main.py
+
+    - name: Upload artifact (optional)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ExpoAgent
+        path: dist/ExpoAgent.exe
+
+    - name: Create Release and Upload EXE
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/ExpoAgent.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

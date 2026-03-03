@@ -1,7 +1,7 @@
 [project]
-name = "windowsscreendeviceagent"
+name = "ExpoAgent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Exhibition Agent for windows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
