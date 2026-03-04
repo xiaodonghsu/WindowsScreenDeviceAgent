@@ -41,4 +41,4 @@ from player.slide_player import get_status as get_slide_player_status, play_slid
 from player.video_player import get_status as get_video_player_status, play_video, forward_video, backward_video, stop_video
 from player.web_player import get_status as get_web_player_status, open_url
 from player.key_mouse import key_press
-from player.cmd_runner import run_command, screen_shutdown
+from player.cmd_runner import run_command, screen_shutdown, screen_restart

@@ -36,3 +36,6 @@ def run_command(command: str):
 
 def screen_shutdown():
     run_command("shutdown -s -t 0")
+
+def screen_restart():
+    run_command("shutdown -r -t 0")
