@@ -32,6 +32,10 @@ class WebPlayerConfig:
         "--user-data-dir=%TEMP%\\ChromeDevSession",
         "--remote-allow-origins=*",
         "--UseBasicParsing",
+        "--disable-session-crashed-bubble",
+        "--disable-infobars",
+        "--no-first-run",
+        "--disable-restore-session-state",
         "--disable-features=Translate"
       ]
 
