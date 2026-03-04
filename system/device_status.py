@@ -1,12 +1,7 @@
 import psutil
 import socket
-import time
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict
-# from system.device_attr import get_device_info
-
-# def collect_status():
-#     return get_device_info()
 
 # Get disk usage information
 def get_disk_usage():

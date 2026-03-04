@@ -37,6 +37,15 @@
 
 使用PyInstaller将脚本打包成可执行文件：
 
+### 注意
+
+打包前，修改版本信息 version-info
+
 ```bash
 uv run pyinstaller --version-file version-info --onefile --icon favicon.ico --name ExpoAgent main.py
 ```
+
+### 提交新的版本自动的版本更新(修改版本号)
+
+git tag v1.0.0.2
+git push origin v1.0.0.2
