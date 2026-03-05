@@ -49,7 +49,7 @@ def update_device_scene_program(tb_client, scene: str):
     if tb_client.attributes.get("scene", "") != scene:
         programs = None
         program_matched = False
-        for device_name in [get_device_name(), "default"]:
+        for device_name in [get_device_name()]:
             for scene_name in [scene, "default"]:
                 logger.info(f"设备: {device_name}, 场景: {scene_name}, 尝试下载资源数据")
                 # 下载场景-资源数据
