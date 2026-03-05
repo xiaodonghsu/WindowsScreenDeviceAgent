@@ -33,11 +33,12 @@ from cms import get_cms_token, get_cms_baseurl
 import argparse
 
 
-# 根据命令行的参数从服务端获取配置信息
+# 0 - 根据命令行的参数从服务端获取配置信息
 # 参数包括:
 #  --cms_baseurl=http://192.168.41.135:1337/api
 #  --cms_token="xxxx"
-#  --device_name=screen-d16
+#  --device_name=screen-b123
+# 如果不存在参数, 从环境变量中获取，否则失败
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--device_name", help="设备名称", default="")
 parser.add_argument("-s", "--cms_baseurl", help="CMS服务器地址", default="")
@@ -55,10 +56,9 @@ if device_name == "":
     logger = setup_logger(__name__)
     logger.error("未提供设备名称, 请设置.env或设置环境变量: IOT_DEVICE_NAME")
     sys.exit(1)
-else:
-    # 初始化日志
-    logger = setup_logger(device_name)
 
+# 初始化日志
+logger = setup_logger(device_name)
 logger.info(f"本地设备名称: {device_name}")
 
 # 获取服务器配置
@@ -67,7 +67,7 @@ if cms_baseurl == "":
     cms_baseurl = get_cms_baseurl()
 logger.info(f"CMS服务器地址: {cms_baseurl}")
 if cms_baseurl == "":
-    logger.error("未提供CMS API地址, 请设置.env或设置环境变量 CMS_BASEURL")
+    logger.error("未提供CMS API地址, 请设置.env或设置环境变量: CMS_BASEURL")
     sys.exit(1)
 
 # 从参数获取令牌
@@ -144,28 +144,39 @@ logger.info(f"启动设备状态周期上报，心跳间隔: {heartbeat_interval
 assets = {}
 player_staus = {"video_player": {},"web_player": {},"slide_player":{}}
 while True:
+    # 周期性例程: 更新设备参数
     try:
-        # 周期性例程: 更新设备参数
         data=get_device_status()
         if data:
             tb.send_telemetry(data=data)
-            logger.debug("设备遥测数据已发送")
+    except Exception as e:
+        logger.error(f"发送设备状态数据失败: {e}")
         # 选择性更新的参数
-        # video_player
+
+    # video_player
+    try:
         from player import get_video_player_status
         status = get_video_player_status()
         if status:
             if not player_staus["video_player"] == status:
                 tb.send_telemetry(data={"video_player": status})
                 player_staus["video_player"] = status
-        # web_player
+    except Exception as e:
+        logger.error(f"发送VideoPlayer遥测数据失败: {e}")
+
+    # web_player
+    try:
         from player import get_web_player_status
         status = get_web_player_status()
         if status:
             if not player_staus["web_player"] == status:
                 tb.send_telemetry(data={"web_player": status})
                 player_staus["web_player"] = status
-        # slide_player
+    except Exception as e:
+        logger.error(f"发送WebPlayer遥测数据失败: {e}")
+
+    # slide_player
+    try:
         from player import get_slide_player_status
         status = get_slide_player_status()
         if status:
@@ -173,6 +184,6 @@ while True:
                 tb.send_telemetry(data={"slide_player": status})
                 player_staus["slide_player"] = status
     except Exception as e:
-        logger.error(f"发送遥测数据失败: {e}")
+        logger.error(f"发送SlidePlayer遥测数据失败: {e}")
 
     time.sleep(heartbeat_interval)

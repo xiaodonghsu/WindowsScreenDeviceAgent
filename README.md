@@ -47,5 +47,5 @@ uv run pyinstaller --version-file version-info --onefile --icon favicon.ico --na
 
 ### 提交新的版本自动的版本更新(修改版本号)
 
-git tag v1.0.0.2
-git push origin v1.0.0.2
+git tag v1.0.0.x
+git push origin v1.0.0.x

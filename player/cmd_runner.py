@@ -34,8 +34,8 @@ def run_command(command: str):
         }
 
 
-def screen_shutdown():
-    run_command("shutdown -s -t 0")
+def screen_shutdown(delay: int = 5):
+    run_command(f"shutdown -s -t {delay}")
 
-def screen_restart():
-    run_command("shutdown -r -t 0")
+def screen_restart(delay: int = 5):
+    run_command(f"shutdown -r -t {delay}")

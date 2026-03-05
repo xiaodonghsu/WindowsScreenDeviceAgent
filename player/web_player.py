@@ -48,7 +48,7 @@ class WebPlayer:
     def start_browser(self, url:str="about:blank") -> bool:
         '''
         检查浏览器是否已经打开,如果没有打开,则打开浏览器
-        如果已经打开,则检查是否有指定的url,如果没有,则打开url
+        检查标签页的数量，从后到前关闭标签页；是否有指定的url,如果没有,则打开url
         '''
         # 直接读取9222端口来测试
         info = self.get_info()
@@ -60,9 +60,17 @@ class WebPlayer:
             logger.info("启动浏览器")
             self._start_browser(url)
 
-        info = self.get_info()
-        if info is None:
+        tabs = self.get_tabs()
+        if tabs is None:
             return False
+        if len(tabs) > 1:
+            logger.info(f"浏览器标签页数量: {len(tabs)}")
+            # 超过1个tab时, 关闭其他所有的tab
+            for i in range(len(tabs)-1, 0, -1):
+                logger.info(f"关闭标签页: {tabs[i].get("title", "")}")
+                self.close_tab(tabs[i].get("id", ""))
+        else:
+            _ = requests.put(f'http://localhost:{self.config.debug_port}/json/new?{url}', timeout=1)
         return True
 
     def get_status(self):
@@ -75,9 +83,10 @@ class WebPlayer:
         status.browser = browser_info.get("Browser")
         tabs = self.get_tabs()
         status.tabs_count = len(tabs)
-        status.tab_tile = tabs[0].get("title")
-        status.tab_url = tabs[0].get("url")   
-        status.tab_type = tabs[0].get("type")
+        if status.tabs_count > 0:
+            status.tab_tile = tabs[0].get("title")
+            status.tab_url = tabs[0].get("url")   
+            status.tab_type = tabs[0].get("type")
         return status
 
     def _start_browser(self, url="about:blank"):
@@ -116,10 +125,22 @@ class WebPlayer:
         try:
             response = requests.get(f'http://localhost:{self.config.debug_port}/json', timeout=0.5)
             tabs = response.json()
+            # 清除掉url是 chrome: 起头的,从列表中清除
+            for i in range(len(tabs)-1, -1, -1):
+                if tabs[i].get("url", "").startswith("chrome://"):
+                    if not tabs[i].get("url", "") == "chrome://newtab/":
+                        _ = tabs.pop(i)
             return tabs
         except Exception as e:
-            logger.error(e)
+            logger.error(f"获取浏览器标签页失败: {e}") 
             return None
+
+    def close_tab(self, tab_id: str) -> None:
+        try:
+            response = requests.get(f'http://localhost:{self.config.debug_port}/json/close/{tab_id}', timeout=0.2)
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f"关闭浏览器标签页{tab_id}失败: {e}") 
 
     def get_info(self):
         try:
@@ -141,33 +162,34 @@ class WebPlayer:
         except Exception as e:
             logger.error(f"激活标签页时出错: {e}")
 
-
-    def browser_interactive(self, payload_list = [{}]):
+    def browser_interactive(self, payload_list = [{}]) -> bool:
         '''
         浏览器交互功能
         '''
         try:
             tabs = self.get_tabs()
             if tabs is not None:
-                ws_url = tabs[0].get("webSocketDebuggerUrl", None)
-                if ws_url:
-                    logger.info(f"连接到 WebSocket: {ws_url}")
-                    ws = websocket.WebSocket()
-                    ws.connect(ws_url)
-                    for payload in payload_list:
-                        self.message_id += 1
-                        payload["id"] = self.message_id
-                        ws.send(json.dumps(payload))
-                        result = ws.recv()
-                        logger.info(f"{payload.get('method')} 响应: {result}")
-                    ws.close()
+                if len(tabs) == 0:
+                    tabs = [requests.put(f'http://localhost:{self.config.debug_port}/json/new', timeout=1)]
+                if len(tabs) > 0:
+                    ws_url = tabs[0].get("webSocketDebuggerUrl", None)
+                    if ws_url:
+                        ws = websocket.WebSocket()
+                        ws.connect(ws_url)
+                        for payload in payload_list:
+                            self.message_id += 1
+                            payload["id"] = self.message_id
+                            ws.send(json.dumps(payload))
+                            result = ws.recv()
+                            logger.info(f"Chrome CDP {payload.get('method')} 响应: {result}")
+                        ws.close()
             return True
         except Exception as e:
-            logger.error(f"打开URL时出错: {e}")
+            logger.error(f"Chrome CDP 命令失败: {e}")
             return False
         
         
-    def navigate_url(self, url="about:blank"):
+    def navigate_url(self, url: str = "about:blank"):
         '''
         浏览网页，检查浏览器的tabs ，如果已经打开，直接返回True
         否则，尝试浏览指定url，返回True
@@ -185,7 +207,14 @@ class WebPlayer:
             return False
 
         if url_is_opened(url):
-            return True
+            payload = {
+                "id": self.message_id, 
+                "method": "Page.reload", 
+                "params": {
+                    "ignoreCache": False
+                    }
+                }
+            return self.browser_interactive([payload])
 
         payload = {
             "id": self.message_id,
@@ -223,8 +252,8 @@ class WebPlayer:
 
 
 def open_url(url:str) -> dict[str, str]:
-    logger.info(f"浏览网页{url}")
     wp = WebPlayer()
+    logger.info(f"启动Chrome浏览器, 打开链接: {url}")
     if not wp.start_browser(url):
         return {"result": "fail"}
     if not wp.navigate_url(url):
