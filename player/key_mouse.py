@@ -1,4 +1,6 @@
 import pyautogui
+import pyperclip
+import time
 import logging
 from common.config import get_device_name
 logger = logging.getLogger(get_device_name())
@@ -25,3 +27,17 @@ def key_press(key: str | list[str]):
             pyautogui.press(key)
     except Exception as e:
         logger.error(f"按键失败: {key}, 错误: {str(e)}")
+
+def input_text(text: str):
+    """
+    文本输入
+    """
+
+    try:
+        logger.info(f"输入文本: {text}")
+        pyperclip.copy(text)
+        time.sleep(0.1)
+        pyautogui.hotkey('Ctrl', 'V')
+        # pyautogui.write(text)
+    except Exception as e:
+        logger.error(f"输入文本错误: {str(e)}")

@@ -39,7 +39,7 @@
 
 ### 注意
 
-打包前，修改版本信息 version-info
+打包前，修改版本信息 version-info （两处更改 1, 0, 0, x)
 
 ```bash
 uv run pyinstaller --version-file version-info --onefile --icon favicon.ico --name ExpoAgent main.py
