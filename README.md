@@ -49,3 +49,8 @@ uv run pyinstaller --version-file version-info --onefile --icon favicon.ico --na
 
 git tag v1.0.0.x
 git push origin v1.0.0.x
+
+
+### 提交后，下载最新的版本，部署到本地，避免网络问题导致下载失败
+
+download_latest_version.sh
