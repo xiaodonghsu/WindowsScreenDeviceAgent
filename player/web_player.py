@@ -23,19 +23,21 @@ class WebPlayerStatus:
 @dataclass
 class WebPlayerConfig:
     exe: str = "chrome.exe"
+    # "--remote-debugging-port=9222",
     debug_port = 9222
+    # "--user-data-dir=%TEMP%\\ChromeDevSession",
     user_data_dir = "%TEMP%\\ChromeDevSession"
     exe_args = [
         "--start-fullscreen",
-        # "--remote-debugging-port=9222",
-        # "--user-data-dir=%TEMP%\\ChromeDevSession",
         "--remote-allow-origins=*",
         "--UseBasicParsing",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
         "--no-first-run",
+        "--no-default-browser-check",
         "--disable-restore-session-state",
-        "--disable-features=Translate"
+        "--disable-features=Translate,TranslateUI",
+        "--autoplay-policy=no-user-gesture-required"
       ]
 
 class WebPlayer:
