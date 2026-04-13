@@ -36,6 +36,8 @@ class WebPlayerConfig:
         "--no-first-run",
         "--no-default-browser-check",
         "--disable-restore-session-state",
+        "--disable-notifications",
+        "--language=zh-CN",
         "--disable-features=Translate,TranslateUI",
         "--autoplay-policy=no-user-gesture-required"
       ]
