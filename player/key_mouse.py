@@ -28,15 +28,18 @@ def key_press(key: str | list[str]):
     except Exception as e:
         logger.error(f"按键失败: {key}, 错误: {str(e)}")
 
-def input_text(text: str):
+def input_text(text: str, overwrite=False):
     """
-    文本输入
+    文本输入, 根据overwrite参数决定是否先清空当前文本
     """
 
     try:
         logger.info(f"输入文本: {text}")
         pyperclip.copy(text)
         time.sleep(0.1)
+        if overwrite:
+            key_press(['ctrl', 'a'])
+            time.sleep(0.1)
         pyautogui.hotkey('Ctrl', 'V')
         # pyautogui.write(text)
     except Exception as e:

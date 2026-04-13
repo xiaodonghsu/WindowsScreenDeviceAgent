@@ -39,6 +39,6 @@ from player.play_program import play_program
 from player.avatar_player import play_avatar, show_text, stop_avatar
 from player.slide_player import get_status as get_slide_player_status, play_slide, next_page, prev_page
 from player.video_player import get_status as get_video_player_status, play_video, forward_video, backward_video, stop_video
-from player.web_player import get_status as get_web_player_status, open_url
+from player.web_player import get_status as get_web_player_status, open_url, close_browser
 from player.key_mouse import key_press, input_text
-from player.cmd_runner import run_command, screen_shutdown, screen_restart
+from player.cmd_runner import run_command, screen_shutdown, screen_restart, screen_startup

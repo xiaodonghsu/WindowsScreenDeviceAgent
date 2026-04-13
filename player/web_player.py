@@ -1,10 +1,8 @@
 from dataclasses import dataclass, asdict
-from dacite import from_dict, Config
-from typing import Literal
 import os
 import subprocess
 import psutil
-from pyautogui import FailSafeException
+import shutil
 import requests
 import websocket
 import json
@@ -26,10 +24,11 @@ class WebPlayerStatus:
 class WebPlayerConfig:
     exe: str = "chrome.exe"
     debug_port = 9222
+    user_data_dir = "%TEMP%\\ChromeDevSession"
     exe_args = [
         "--start-fullscreen",
-        "--remote-debugging-port=9222",
-        "--user-data-dir=%TEMP%\\ChromeDevSession",
+        # "--remote-debugging-port=9222",
+        # "--user-data-dir=%TEMP%\\ChromeDevSession",
         "--remote-allow-origins=*",
         "--UseBasicParsing",
         "--disable-session-crashed-bubble",
@@ -42,6 +41,9 @@ class WebPlayerConfig:
 class WebPlayer:
     def __init__(self):
         self.config = WebPlayerConfig()
+        os_temp_dir = os.environ.get("TEMP")
+        if "%TEMP%" in self.config.user_data_dir:
+            self.config.user_data_dir = self.config.user_data_dir.replace("%TEMP%", os_temp_dir)
         self.message_id: int = 0
         self.browser_info = None
 
@@ -57,13 +59,16 @@ class WebPlayer:
             logger.info("无可控的浏览器打开,尝试关闭可能已经打开的浏览器")
             self._terminate_browser()
             # 启动浏览器
+            # 清除浏览器的用户数据目录
+            self._clear_browser_user_data_dir()
             logger.info("尝试启动可控的浏览器")
-            self._start_browser(url)
-            tabs = self.get_tabs()
+            self._browser_startup(url)
             logger.info("确认浏览器是否准备好")
+            tabs = self.get_tabs()
             if tabs is None:
                 logger.error("浏览器启动失败!")
                 return False
+            logger.info("浏览器启动成功")
             return True
         else:
             if len(tabs) > 1:
@@ -75,6 +80,16 @@ class WebPlayer:
             logger.info(f"打开 {url}")
             self.browser_interactive(url)
         return True
+
+    def _clear_browser_user_data_dir(self):
+        if os.path.exists(self.config.user_data_dir):
+            # windows下清除目录
+            try:
+                logger.info(f"删除浏览器用户数据目录: {self.config.user_data_dir}")
+                shutil.rmtree(self.config.user_data_dir)
+            except Exception as e:
+                logger.warning(f"删除浏览器用户数据目录失败: {e}")
+        logger.info(f"清除浏览器用户数据目录完成: {self.config.user_data_dir}")
 
     def get_status(self):
         status: WebPlayerStatus = WebPlayerStatus()
@@ -92,7 +107,7 @@ class WebPlayer:
             status.tab_type = tabs[0].get("type")
         return status
 
-    def _start_browser(self, url="about:blank"):
+    def _browser_startup(self, url="about:blank"):
         # 获取可执行文件的全路径
         if not os.path.exists(self.config.exe):
             from system.config import get_app_path
@@ -103,11 +118,13 @@ class WebPlayer:
                 logger.error(f"{self.config.exe} not found")
                 raise ValueError(f"{self.config.exe} not found")
         # 组织命令行
-        os_temp_dir = os.environ.get("TEMP")
         cmdline = [f'{self.config.exe}',]
+        # 调试基本参数
+        cmdline.append(f"--remote-debugging-port={self.config.debug_port}")
+        # 环境参数
+        cmdline.append (f"--user-data-dir={self.config.user_data_dir}") 
+        # 其他参数表
         for arg in self.config.exe_args:
-            if "%TEMP%" in arg:
-                arg = arg.replace("%TEMP%", os_temp_dir)
             cmdline.append(arg)
         cmdline.append(url)
         logger.info(f"启动浏览器: {' '.join(cmdline)}")
@@ -137,7 +154,6 @@ class WebPlayer:
                     result.append(tab)
             return result
         except Exception as e:
-            logger.error(f"获取浏览器标签页失败: {e}") 
             return None
 
     def close_tab(self, tab_id: str) -> None:
@@ -148,6 +164,8 @@ class WebPlayer:
             logger.error(f"关闭浏览器标签页{tab_id}失败: {e}") 
 
     def close_browser(self) -> None:
+        if self.get_info() is None:
+            return True
         tabs = self.get_tabs()
         for tab in tabs:
             self.close_tab(tab.get("id"))

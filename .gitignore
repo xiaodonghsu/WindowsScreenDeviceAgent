@@ -23,6 +23,3 @@ assets.json
 # local files
 deploy.md
 test.md
-
-# pyinstaller spec
-*.spec
