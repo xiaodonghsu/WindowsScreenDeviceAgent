@@ -64,7 +64,7 @@ class WebPlayer:
             self._terminate_browser()
             # 启动浏览器
             # 清除浏览器的用户数据目录
-            self._clear_browser_user_data_dir()
+            # self._clear_browser_user_data_dir()
             logger.info("尝试启动可控的浏览器")
             self._browser_startup(url)
             logger.info("确认浏览器是否准备好")
