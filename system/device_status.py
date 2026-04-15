@@ -2,6 +2,7 @@ import psutil
 import socket
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict
+from system.device_temperature import get_cpu_temperature
 
 # Get disk usage information
 def get_disk_usage():
@@ -51,12 +52,14 @@ def get_slide_player_status():
 @dataclass
 class DeviceStatus:
     cpu_percent: float = 0.0
+    cpu_temperature: dict = field(default_factory=dict)
     memory_percent: float = 0.0
     network: Dict[str, str] = field(default_factory=dict)
 
 def get_device_status():
     status = DeviceStatus()
     status.cpu_percent = psutil.cpu_percent()
+    status.cpu_temperature = get_cpu_temperature()
     status.memory_percent = psutil.virtual_memory().percent
     status.network = get_network_status()
     return asdict(status)

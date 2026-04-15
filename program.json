@@ -1,1 +1,1 @@
-{"scene": "default", "programs": [{"name": "浏览器节目", "type": "webpage", "url": "http://192.168.4.244/expo/?screen=default&scene=default", "file": "", "config": {}}]}
+{"scene": "default", "programs": [{"name": "浏览器节目", "type": "webpage", "url": "http://192.168.4.244/expo-dist/?screen=dev_test_xxd&scene=default&particle=200", "file": "", "config": {}}]}
