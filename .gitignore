@@ -17,10 +17,10 @@ logs/
 
 # configs
 .env
-program.json
 config.json
 assets.json
 
 # local files
 deploy.md
 test.md
+program.json

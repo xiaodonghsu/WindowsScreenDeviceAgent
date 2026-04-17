@@ -3,6 +3,7 @@ import socket
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict
 from system.device_temperature import get_cpu_temperature
+from system.device_monitor import get_monitor_device
 
 # Get disk usage information
 def get_disk_usage():
@@ -54,6 +55,7 @@ class DeviceStatus:
     cpu_percent: float = 0.0
     cpu_temperature: dict = field(default_factory=dict)
     memory_percent: float = 0.0
+    monitor: list[dict[str, Any]] = field(default_factory=list)
     network: Dict[str, str] = field(default_factory=dict)
 
 def get_device_status():
@@ -62,4 +64,5 @@ def get_device_status():
     status.cpu_temperature = get_cpu_temperature()
     status.memory_percent = psutil.virtual_memory().percent
     status.network = get_network_status()
+    status.monitor = get_monitor_device()
     return asdict(status)
